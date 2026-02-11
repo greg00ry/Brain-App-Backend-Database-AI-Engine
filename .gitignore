@@ -8,6 +8,7 @@ node_modules/
 
 # Build output
 dist/
+build/
 
 # IDE
 .idea/
@@ -30,3 +31,13 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# Frontend specific
+*.local
+.eslintcache
+
+# Backend specific
+backend/.env
+
+# Frontend specific
+frontend/.env
