@@ -1,10 +1,20 @@
+import React, {useState} from "react"
+import type { ChangeEvent } from "react"
 
 
 
+interface LandingProps {
+    onStartClick: () => void
+}
 
 
+const Landing: React.FC<LandingProps> = ({ onStartClick }) => {
+    
 
-function Landing() {
+    
+
+    
+    
     return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
        
@@ -51,7 +61,7 @@ function Landing() {
             </div>
 
             <button 
-              
+              onClick={ onStartClick } 
               className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white text-lg font-semibold rounded-xl transition shadow-lg shadow-purple-500/25"
             >
               Get Started →
