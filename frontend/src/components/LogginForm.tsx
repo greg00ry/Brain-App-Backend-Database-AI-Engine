@@ -23,8 +23,6 @@ const LogginForm: React.FC = () => {
     
     return (
         <div>
-           
-            Zaloguj się
             <form onSubmit={handleSubmit}>
                 <input 
                 type="email"
@@ -39,6 +37,7 @@ const LogginForm: React.FC = () => {
                 onChange={(e) => handleChange(e, setPassword)} 
                 />
             </form>
+            <button type="submit">Zaloguj się</button>
         </div>
     )
 }
