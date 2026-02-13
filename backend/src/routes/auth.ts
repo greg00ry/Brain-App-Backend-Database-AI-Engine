@@ -100,4 +100,26 @@ router.post('/logout', (_req: Request, res: Response) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+router.post("/verify", (req: Request, res: Response) => {
+   const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header missing or invalid' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    res.status(200).json({
+      message: 'Token is valid',
+      user: decoded, // Zwracamy dane użytkownika zakodowane w tokenie
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+})
+
 export default router;

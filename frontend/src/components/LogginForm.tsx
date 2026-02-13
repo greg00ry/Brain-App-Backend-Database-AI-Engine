@@ -1,14 +1,18 @@
 import React, {useState, type ChangeEvent} from "react"
 import axios from "axios"
-import { useSubmit } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
+interface LogginFormProps {
+  setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>
+}
 
-
-const LogginForm: React.FC = () => {
+const LogginForm: React.FC<LogginFormProps> = ({ setIsLoggedIn }) => {
    
     const [email, setEmail] = useState<string>("")
     const [password, setPassword] = useState<string>("")
     const [error, setError] = useState<string | null>("")
+
+    const navigate = useNavigate()
 
     //Typowanie zdarzenia inputa
     const handleChange = (e: ChangeEvent<HTMLInputElement>,
@@ -30,14 +34,23 @@ const LogginForm: React.FC = () => {
             })
 
             console.log("Login succesfull:", response.data)
-            //obsluga logowania
-            //
-            //
-            //
+            
 
             localStorage.setItem("token", response.data.token)
             alert("Zalogowano pomyślnie!")
 
+            //aktualizacja stanu logowania
+            setIsLoggedIn(true)
+            //przekierowanie na dashboard
+
+            
+            navigate("/dashboard")
+                
+
+            console.log("/dashboard");
+
+            
+            
 
         } catch (err: any) {
             console.log("Login failed:", err)
@@ -47,6 +60,8 @@ const LogginForm: React.FC = () => {
     
     
     return (
+        
+
         <div>
             <form onSubmit={handleSubmit}>
                 <input 
@@ -63,9 +78,12 @@ const LogginForm: React.FC = () => {
                 />
             <button type="submit">Zaloguj się</button>
             </form>
+            {error && <p style={{color: "red"}}>{error}</p>}
         </div>
+                
     )
 }
+
 
 export {
     LogginForm
