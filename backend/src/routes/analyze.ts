@@ -7,15 +7,15 @@ interface AIAnalysis {
   tags: string[];
   strength: number;
   category: string;
+  isProcessed: boolean;
 }
 
-// Analyze text using LM Studio
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { text } = req.body;
+let isProcessed = false
+export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
+  
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: 'Text is required' });
+      throw new Error("Text is required for anylisis")
     }
 
     const prompt = `Analyze the following text and return a JSON object with these exact fields:
@@ -54,45 +54,56 @@ Return ONLY valid JSON, no additional text.`;
     });
 
     if (!aiResponse.ok) {
-      console.error('LM Studio error');
-      return res.status(503).json({
-        error: 'AI service unavailable. Make sure LM Studio is running on http://localhost:1234',
-        fallback: {
-          summary: text.substring(0, 100) + '...',
-          tags: ['unprocessed'],
-          strength: 5,
-          category: 'Uncategorized',
-        },
-      });
+      throw new Error("AI service unavailable")
     }
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || '';
 
     // Parse JSON from AI response
-    let analysis: AIAnalysis;
+    let analysis: AIAnalysis
+    
     try {
       // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[0]);
+      if (jsonMatch){
+        analysis = JSON.parse(jsonMatch[0])
+        isProcessed = true
       } else {
-        throw new Error('No JSON found in response');
+        throw new Error("No JSON found in response")
       }
     } catch {
       console.error('Failed to parse AI response:', content);
-      analysis = {
+      return {
         summary: text.substring(0, 100) + '...',
         tags: ['unprocessed'],
         strength: 5,
         category: 'Uncategorized',
+        isProcessed: false
       };
     }
+    return {...analysis, isProcessed}
 
-    res.json(analysis);
-  } catch (error) {
-    console.error('Error analyzing text:', error);
-    res.status(500).json({ error: 'Failed to analyze text' });
+  
+}
+
+
+
+
+// Analyze text using LM Studio
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body
+  
+    const analysis = await analyzeTextWithAI(text)
+  
+    res.json(analysis)
+  } catch (error: any) {
+    console.error("Error in analyze router:", error)
+    if (error.message === "AI service unavailable") {
+      return res.status(503).json({error: error.message})
+    }
+    res.status(500).json({error: "Failed to analyze text"})
   }
 });
 

@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
             })
 
             setAnalysisResult(response)
-            console.log(analysisResult)
+            //in process
 
 
 
