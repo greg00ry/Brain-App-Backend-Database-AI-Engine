@@ -1,8 +1,33 @@
 import React, { useState } from "react";
 import { Layout, Database, Brain, Terminal, Settings, Activity } from 'lucide-react';
+import axios from "axios";
 
 const Dashboard: React.FC = () => {
-    const [query, setQuery] = useState("");
+    const [query, setQuery] = useState<string>("");
+    const [analysisResult, setAnalysisResult] = useState<any | null>("")
+    const [error, setError] = useState<string | null>("")
+    
+    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        setError(null)
+
+        try {
+            const response = await axios.post("http://localhost:3001/api/analyze", {
+                text: query
+            })
+
+            setAnalysisResult(response)
+            console.log(analysisResult)
+
+
+
+
+        } catch (error: any) {
+            console.log("Sending message failed: ", error)
+            setError(error.response?.data?.message || "Wystapił błąd podczas wysyłania wiadomości")
+        }
+    }
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-slate-200 font-sans">
       {/* SIDEBAR - Styl Atlas */}
@@ -60,16 +85,18 @@ const Dashboard: React.FC = () => {
             <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl">
               <label className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-4 block">Human Language Instruction</label>
               <div className="relative">
-                <input 
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g., Show me all unpaid invoices from Warsaw..."
-                  className="w-full bg-[#020817] border border-slate-700 rounded-lg py-4 px-6 text-lg focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all shadow-inner"
-                />
-                <button className="absolute right-3 top-3 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md font-medium transition-colors">
-                  Execute
-                </button>
+                <form onSubmit={handleSubmit}>
+                    <input 
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="e.g., Show me all unpaid invoices from Warsaw..."
+                    className="w-full bg-[#020817] border border-slate-700 rounded-lg py-4 px-6 text-lg focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all shadow-inner"
+                    />
+                    <button type="submit" className="absolute right-3 top-3 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                    Execute
+                    </button>
+                </form>
               </div>
             </div>
 
@@ -89,7 +116,7 @@ const Dashboard: React.FC = () => {
                    <Brain size={12}/> Intent Parser (JSON)
                 </span>
                 <div className="flex-1 bg-black/40 rounded p-3 font-mono text-xs text-green-400 overflow-auto">
-                  {`{ "action": "FETCH", "table": "invoices", "filter": "status=unpaid" }`}
+                  {JSON.stringify(analysisResult.data, null, 4)}
                 </div>
               </div>
             </div>
