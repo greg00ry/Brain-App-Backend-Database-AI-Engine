@@ -56,6 +56,11 @@ function App() {
     }
     verifyToken()
   },[])
+
+  //dodac 3 stan zeby usunąć pol sekundowe wylogowanie
+  //dodac ochrone sciezek jak niezalogowany powrot na landing
+  //ustawic auto-logout
+  //xmienic w api zeby dane pobierały sie z bazy a nie z tokena
   
 
   return (
