@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { analyzeTextWithAI } from '../services/analyzeTextWithAI.js';
+import { analyzeController } from '../controllers/analyzeController.js';
 
 
 const router = Router();
@@ -11,11 +11,10 @@ const router = Router();
 // Analyze text using LM Studio
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { text } = req.body
-  
-    const analysis = await analyzeTextWithAI(text)
-  
-    res.json(analysis)
+    const response = analyzeController(req, res)
+
+
+
   } catch (error: any) {
     console.error("Error in analyze router:", error)
     if (error.message === "AI service unavailable") {
