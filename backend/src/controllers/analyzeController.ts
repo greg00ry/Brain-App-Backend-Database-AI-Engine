@@ -1,5 +1,5 @@
 
-import { analyzeTextWithAI } from "../services/analyzeTextWithAI.js"
+import { analyzeTextWithAI } from "../services/ai/analyzeTextWithAI.js"
 import { Request, Response } from "express";
 
 

@@ -1,5 +1,5 @@
 
-
+import { ANALYZE_PROMPT } from "./prompts/analyzePrompt.js";
 
 interface AIAnalysis {
   summary: string;
@@ -12,24 +12,11 @@ interface AIAnalysis {
 
 export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
     
-  
+    
 
-    if (!text || text.trim().length === 0) {
-      throw new Error("Text is required for anylisis")
-    }
+    
 
-    const prompt = `Analyze the following text and return a JSON object with these exact fields:
-        - summary: A concise summary (max 100 words)
-        - tags: An array of 3-5 relevant tags
-        - strength: A number from 1-10 indicating how important/memorable this information is (1=trivial, 10=critical)
-        - category: A single category name (e.g., "Work", "Personal", "Health", "Finance", "Learning", "Ideas")
-
-        Text to analyze:
-        """
-        ${text}
-        """
-
-        Return ONLY valid JSON, no additional text.`;
+    const prompt = ANALYZE_PROMPT(text);
 
           const aiResponse = await fetch('http://localhost:1234/v1/chat/completions', {
               method: 'POST',
@@ -61,19 +48,21 @@ export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
             const content = aiData.choices?.[0]?.message?.content || '';
 
             // Parse JSON from AI response
-            let analysis: AIAnalysis
+            
             
             try {
               // Try to extract JSON from the response
               const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch){
-                analysis = JSON.parse(jsonMatch[0])
-                return {
-                  ...analysis,
-                  isProcessed: true
-                }
-              } else {
-                throw new Error("No JSON found in response")
+              if (!jsonMatch) throw new Error("No JSON found")
+              
+              const parsed = JSON.parse(jsonMatch[0])
+
+              return {
+                summary: parsed.summary || text.substring(0, 50),
+                tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+                strength: Number(parsed.strength) || 0,
+                category: parsed.category || 'Other',
+                isProcessed: true
               }
             } catch {
               console.error('Failed to parse AI response:', content);
