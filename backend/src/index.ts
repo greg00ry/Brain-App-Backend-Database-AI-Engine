@@ -16,8 +16,8 @@ import {
   runSubconsciousNow, 
   runConsciousNow, 
   runVaultProcessorNow 
-} from './jobs/vaultProcessor.js';
-import { scheduleDreamingMode, triggerDreamingMode } from './jobs/dreamingMode.js';
+} from './services/vaultProcessor.js';
+//import { scheduleDreamingMode, triggerDreamingMode } from './jobs/dreamingMode.js';
 
 dotenv.config();
 
@@ -51,18 +51,19 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Start server
+//caly server do poprawy
 async function start() {
   await connectDB();
   
   // Start scheduled jobs
   scheduleVaultProcessorJob();
-  scheduleDreamingMode();
+ // scheduleDreamingMode();
   
   // Run test modes on startup
   if (TEST_DREAMING_MODE) {
     console.log('🧪 TEST MODE: Running dreaming mode on startup...');
     setTimeout(() => {
-      triggerDreamingMode().catch((err: unknown) => console.error('Dreaming mode error:', err));
+   //   triggerDreamingMode().catch((err: unknown) => console.error('Dreaming mode error:', err));
     }, 2000);
   }
   

@@ -3,8 +3,8 @@ import {
   runVaultProcessorNow, 
   runSubconsciousNow, 
   runConsciousNow 
-} from '../jobs/vaultProcessor.js';
-import { triggerDreamingMode, getDreamingStats } from '../jobs/dreamingMode.js';
+} from '../services/vaultProcessor.js';
+//import { triggerDreamingMode, getDreamingStats } from '../jobs/dreamingMode.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -40,7 +40,7 @@ router.post('/process-vault', async (req: Request, res: Response) => {
 });
 
 // Manually trigger dreaming mode (synapse pruning/decay)
-router.post('/dreaming-mode', async (req: Request, res: Response) => {
+/*router.post('/dreaming-mode', async (req: Request, res: Response) => {
   try {
     const user = (req as AuthRequest).user!;
     console.log(`🌙 Manual dreaming mode triggered by user: ${user.email}`);
@@ -58,10 +58,10 @@ router.post('/dreaming-mode', async (req: Request, res: Response) => {
     console.error('Error triggering dreaming mode:', error);
     res.status(500).json({ error: 'Failed to start dreaming mode' });
   }
-});
+});*/
 
 // Get job status
-router.get('/status', async (_req: Request, res: Response) => {
+/*router.get('/status', async (_req: Request, res: Response) => {
   const dreamingStats = getDreamingStats();
   
   res.json({
@@ -84,7 +84,7 @@ router.get('/status', async (_req: Request, res: Response) => {
       status: 'scheduled'
     }
   });
-});
+});*/
 
 // Manually trigger ONLY subconscious routine (no AI)
 router.post('/subconscious', async (req: Request, res: Response) => {

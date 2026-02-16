@@ -10,10 +10,17 @@ import { VaultEntry } from '../models/VaultEntry.js';
  * @param id2 - Second neuron ObjectId
  * @returns The updated or created synapse
  */
+
+export interface FireSynapseResult {
+  synapse: ISynapse
+  created: boolean
+}
+
 export async function fireSynapse(
   id1: Types.ObjectId | string,
-  id2: Types.ObjectId | string
-): Promise<ISynapse> {
+  id2: Types.ObjectId | string,
+  reason: string = "Manual connection"
+): Promise<FireSynapseResult> {
   const fromId = new Types.ObjectId(id1);
   const toId = new Types.ObjectId(id2);
 
@@ -24,11 +31,13 @@ export async function fireSynapse(
 
   // Try to find existing synapse
   let synapse = await Synapse.findOne({ from, to });
+  const isNew = !synapse
 
   if (synapse) {
     // Strengthen existing synapse
     synapse.weight = Math.min(1.0, synapse.weight + 0.1);
     synapse.lastFired = new Date();
+    synapse.reason = reason
     
     // Increase stability slightly when fired (gets harder to forget)
     synapse.stability = Math.min(1.0, synapse.stability + 0.05);
@@ -40,15 +49,16 @@ export async function fireSynapse(
     synapse = new Synapse({
       from,
       to,
-      weight: 0.1,
+      weight: 0.3,
       stability: 0.5,
       lastFired: new Date(),
+      reason
     });
     await synapse.save();
     console.log(`🆕 Synapse created: ${from} <-> ${to}`);
   }
 
-  return synapse;
+  return { synapse, created: isNew};
 }
 
 /**
@@ -60,7 +70,7 @@ export async function fireSynapse(
 export async function fireMultipleSynapses(ids: (Types.ObjectId | string)[]): Promise<void> {
   if (ids.length < 2) return;
 
-  const promises: Promise<ISynapse>[] = [];
+  const promises: Promise<FireSynapseResult>[] = [];
   
   // Create synapses between all pairs
   for (let i = 0; i < ids.length; i++) {

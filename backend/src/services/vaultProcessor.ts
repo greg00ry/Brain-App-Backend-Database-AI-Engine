@@ -4,6 +4,7 @@ import { VaultEntry, IVaultEntry } from '../models/VaultEntry.js';
 import { LongTermMemory } from '../models/LongTermMemory.js';
 import { Category, getCategoriesForAI } from '../models/Category.js';
 import { Synapse } from '../models/Synapse.js';
+import { fireSynapse } from './synapseService.js';
 
 const LM_STUDIO_URL = process.env.LM_STUDIO_URL || 'http://localhost:1234';
 
@@ -65,64 +66,7 @@ interface ConsciousStats {
 // 🔗 SYNAPSE MANAGEMENT
 // ============================================================================
 
-/**
- * Upsert a synapse between two entries.
- * If exists: increase weight (max 1.0) and update lastFired.
- * If not: create new with initial weight and stability.
- */
-async function upsertSynapse(
-  fromId: string,
-  toId: string,
-  reason: string
-): Promise<{ created: boolean; weight: number }> {
-  const fromObjectId = new mongoose.Types.ObjectId(fromId);
-  const toObjectId = new mongoose.Types.ObjectId(toId);
 
-  // Check if synapse already exists
-  const existingSynapse = await Synapse.findOne({
-    from: fromObjectId,
-    to: toObjectId,
-  });
-
-  if (existingSynapse) {
-    // Update existing synapse
-    const newWeight = Math.min(existingSynapse.weight + WEIGHT_INCREMENT, 1.0);
-    existingSynapse.weight = newWeight;
-    existingSynapse.lastFired = new Date();
-    // Update reason if new one is provided
-    if (reason && reason.length > 0) {
-      existingSynapse.reason = reason;
-    }
-    await existingSynapse.save();
-
-    console.log(`👁️ [Świadomość] 🔗 Wzmocniono synapsę: weight ${existingSynapse.weight.toFixed(2)} → ${newWeight.toFixed(2)}`);
-    return { created: false, weight: newWeight };
-  } else {
-    // Create new synapse
-    await Synapse.create({
-      from: fromObjectId,
-      to: toObjectId,
-      weight: INITIAL_SYNAPSE_WEIGHT,
-      stability: INITIAL_SYNAPSE_STABILITY,
-      reason,
-      lastFired: new Date(),
-    });
-
-    // Get entry summaries for logging
-    const [fromEntry, toEntry] = await Promise.all([
-      VaultEntry.findById(fromObjectId).select('summary rawText'),
-      VaultEntry.findById(toObjectId).select('summary rawText'),
-    ]);
-
-    const fromTitle = fromEntry?.summary?.substring(0, 30) || fromEntry?.rawText?.substring(0, 30) || fromId.substring(0, 8);
-    const toTitle = toEntry?.summary?.substring(0, 30) || toEntry?.rawText?.substring(0, 30) || toId.substring(0, 8);
-
-    console.log(`👁️ [Świadomość] 🔗 Utworzono nową synapsę: [${fromTitle}...] → [${toTitle}...]`);
-    console.log(`   └─ Powód: ${reason.substring(0, 80)}${reason.length > 80 ? '...' : ''}`);
-
-    return { created: true, weight: INITIAL_SYNAPSE_WEIGHT };
-  }
-}
 
 /**
  * Process synapses from AI analysis, respecting the max limit per entry.
@@ -131,7 +75,7 @@ async function processSynapseLinks(
   synapses: SynapseLink[],
   deltaEntryIds: Set<string>
 ): Promise<number> {
-  let created = 0;
+  let createdCount = 0;
 
   // Group synapses by source entry
   const synapsesBySource = new Map<string, SynapseLink[]>();
@@ -156,15 +100,15 @@ async function processSynapseLinks(
 
     for (const link of topLinks) {
       try {
-        const result = await upsertSynapse(link.sourceId, link.targetId, link.reason);
-        if (result.created) created++;
+        const { created } = await fireSynapse(link.sourceId, link.targetId, link.reason);
+        if (created) createdCount++;
       } catch (error) {
         console.error(`👁️ [Świadomość] ❌ Błąd tworzenia synapsy:`, error);
       }
     }
   }
 
-  return created;
+  return createdCount;
 }
 
 // ============================================================================
