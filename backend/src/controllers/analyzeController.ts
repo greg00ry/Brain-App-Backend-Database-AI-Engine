@@ -1,19 +1,23 @@
 
-import { analyzeTextWithAI } from "../services/ai/analyzeTextWithAI.js"
+import { AuthRequest } from "../middleware/auth.js";
 import { Request, Response } from "express";
+import { proccessAndStore } from "../services/ingest/processAndStore.js";
 
 
 export const analyzeController = async (req: Request, res: Response) => {
 
     try {
+        const user = (req as AuthRequest).user!
         const { text } = req.body
+
+        console.log(user)
 
         if (!text || typeof text !== "string") {
             return res.status(400).json({error: "invalid input"})
         }
 
         //Analiza AI
-        const analysis = await analyzeTextWithAI(text)
+        const analysis = await proccessAndStore(user._id.toString(), text)
 
         return res.status(200).json(analysis)
 

@@ -1,7 +1,7 @@
 
 import { ANALYZE_PROMPT } from "./prompts/analyzePrompt.js";
 
-interface AIAnalysis {
+export interface AIAnalysis {
   summary: string;
   tags: string[];
   strength: number;

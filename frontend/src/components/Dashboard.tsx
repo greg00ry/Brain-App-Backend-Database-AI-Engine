@@ -11,9 +11,15 @@ const Dashboard: React.FC = () => {
         e.preventDefault()
         setError(null)
 
+        const token = localStorage.getItem("token")
+
         try {
             const response = await axios.post("http://localhost:3001/api/analyze", {
                 text: query
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
             })
 
             setAnalysisResult(response)
