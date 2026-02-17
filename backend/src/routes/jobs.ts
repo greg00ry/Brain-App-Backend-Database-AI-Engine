@@ -3,7 +3,7 @@ import {
   runVaultProcessorNow, 
   runSubconsciousNow, 
   runConsciousNow 
-} from '../services/vaultProcessor.js';
+} from '../jobs/vaultProcessor.js';
 //import { triggerDreamingMode, getDreamingStats } from '../jobs/dreamingMode.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 

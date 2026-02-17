@@ -1,4 +1,5 @@
-import { runConsciousProcessor, runSubconsciousRoutine } from "../services/vaultProcessor.js";
+import { runSubconsciousRoutine } from "../services/brain/subconscious.routine.js";
+import { runConsciousProcessor } from "../services/brain/conscious.processor.js";
 
 /**
  * Główny punkt wejścia dla nocnego cyklu "The Brain".

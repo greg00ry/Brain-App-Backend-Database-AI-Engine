@@ -1,4 +1,4 @@
-import { analyzeTextWithAI } from "../ai/analyzeTextWithAI.js";
+import { analyzeTextWithAI } from "../ai/analyze.service.js";
 import { saveAnalyzedEntry } from "../db/saveAnalyzedEntry.js";
 
 export const proccessAndStore = async (userId: string, text: string) => {

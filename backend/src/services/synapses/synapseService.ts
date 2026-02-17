@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
-import { Synapse, ISynapse } from '../models/Synapse.js';
-import { VaultEntry } from '../models/VaultEntry.js';
+import { Synapse, ISynapse } from '../../models/Synapse.js';
+import { VaultEntry } from '../../models/VaultEntry.js';
 
 /**
  * Fire a synapse between two neurons (VaultEntries).

@@ -10,7 +10,7 @@ import {
   getSynapseStats,
   weakenSynapse,
   getStrongestSynapses,
-} from '../services/synapseService.js';
+} from '../services/synapses/synapseService.js';
 
 const router = Router();
 
