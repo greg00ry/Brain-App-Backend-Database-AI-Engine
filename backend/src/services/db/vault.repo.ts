@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js"
 import { Category, ICategory } from "../../models/Category.js";
 import { TopicAnalysis, LongTermMemoryData } from "../brain/conscious.processor.js";
@@ -108,6 +108,34 @@ export const VaultRepo = {
               { _id: { $in: entries.map(e => e._id) } },
               { $set: { isConsolidated: true } }
             );
-    }
-                
+    },
+    //-------------------------------------
+    //Subconscious
+    //------------------------------------
+    async findEntriesToDecay(oneDayAgo: Date) {
+        const entriesToDecay = await VaultEntry.find({
+      isConsolidated: false,
+      lastActivityAt: { $lt: oneDayAgo },
+      strength: { $gt: 0 },
+    }).select('_id strength');
+    return entriesToDecay
+    },
+    async bulkWriteDecayOps(decayOps: any) {
+        return await VaultEntry.bulkWrite(decayOps);
+    },
+    async pruneResults() {
+        return await VaultEntry.deleteMany({
+            strength: { $lte: 0 },
+            isConsolidated: false, // Never delete consolidated entries
+        });
+    },
+    async markStrongEntries() {
+        return await VaultEntry.find({
+            strength: { $gte: 10 },
+            isConsolidated: false,
+        }).select('_id');
+    },
+   async getTotalProcessedCount(){
+        return await VaultEntry.countDocuments();
+    }       
 }
