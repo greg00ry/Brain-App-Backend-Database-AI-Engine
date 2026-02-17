@@ -145,8 +145,8 @@ async function seedTestData(): Promise<void> {
   // Clean existing test data
   console.log(`🧹 Czyszczę dane testowe dla userId: ${TEST_USER_ID}`);
   
-  const deletedEntries = await VaultEntry.deleteMany({ userId: TEST_USER_ID });
-  console.log(`   ↳ Usunięto ${deletedEntries.deletedCount} wpisów VaultEntry`);
+  //const deletedEntries = await VaultEntry.deleteMany({ userId: TEST_USER_ID });
+  //console.log(`   ↳ Usunięto ${deletedEntries.deletedCount} wpisów VaultEntry`);
 
   // Get all entry IDs for this user before deleting synapses
   const entryIds = await VaultEntry.find({ userId: TEST_USER_ID }).distinct('_id');
