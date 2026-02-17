@@ -1,4 +1,5 @@
 
+import { callLMStudio, cleanAndParseJSON } from "./ai.service.js";
 import { ANALYZE_PROMPT } from "./prompts/analyzePrompt.js";
 
 export interface AIAnalysis {
@@ -17,28 +18,13 @@ export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
     
 
     const prompt = ANALYZE_PROMPT(text);
-
-          const aiResponse = await fetch('http://localhost:1234/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'local-model',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'You are a technical assistant that analyzes text and returns structured JSON data. Always respond with valid JSON only.',
-                  },
-                  {
-                    role: 'user',
-                    content: prompt,
-                  },
-                ],
-                temperature: 0.7,
-                max_tokens: 500,
-              }),
-            });
+          const aiResponse = await callLMStudio({
+            prompt: prompt,
+            content: 'You are a technical assistant that analyzes text and returns structured JSON data. Always respond with valid JSON only.',
+            temperature: 0.7,
+            max_tokens: 500
+          })
+          
 
             if (!aiResponse.ok) {
               throw new Error("AI service unavailable")
@@ -52,10 +38,10 @@ export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
             
             try {
               // Try to extract JSON from the response
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (!jsonMatch) throw new Error("No JSON found")
+              const parsed = cleanAndParseJSON(content)
+              if (!parsed) throw new Error("No JSON found")
               
-              const parsed = JSON.parse(jsonMatch[0])
+              
 
               return {
                 summary: parsed.summary || text.substring(0, 50),

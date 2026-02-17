@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { Synapse } from '../models/Synapse.js';
 import { VaultEntry } from '../models/VaultEntry.js';
@@ -10,7 +9,7 @@ import {
   getSynapseStats,
   weakenSynapse,
   getStrongestSynapses,
-} from '../services/synapses/synapseService.js';
+} from '../services/synapses/synapse.service.js';
 
 const router = Router();
 

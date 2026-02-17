@@ -1,7 +1,7 @@
 
 import { AuthRequest } from "../middleware/auth.js";
 import { Request, Response } from "express";
-import { proccessAndStore } from "../services/ingest/processAndStore.js";
+import { proccessAndStore } from "../services/ingest/ingest.service.js";
 
 
 export const analyzeController = async (req: Request, res: Response) => {

@@ -9,7 +9,7 @@ import entriesRouter from "./routes/entries.js"
 import analyzeRouter from "./routes/analyze.js"
 
 //Jobs
-import { runNightlyRoutine } from "./jobs/runNightlyRoutine.js";
+import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
 import { timeStamp } from "console";
 
 dotenv.config()
