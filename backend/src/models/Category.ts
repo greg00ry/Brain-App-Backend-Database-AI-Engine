@@ -52,12 +52,3 @@ const categorySchema = new Schema<ICategory>(
 
 export const Category = mongoose.model<ICategory>('Category', categorySchema);
 
-// Helper to get categories for AI prompt
-export async function getCategoriesForAI(): Promise<{ name: string; description: string; keywords: string[] }[]> {
-  const categories = await Category.find({ isActive: true }).sort({ order: 1 });
-  return categories.map((cat: ICategory) => ({
-    name: cat.name,
-    description: cat.description,
-    keywords: cat.keywords,
-  }));
-}

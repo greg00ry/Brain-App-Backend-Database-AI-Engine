@@ -4,7 +4,9 @@ import { Category } from "../../models/Category.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
 import { SynapseLink, processSynapseLinks } from "../synapses/synapse.service.js";
 import { callLMStudio, cleanAndParseJSON } from "../ai/ai.service.js";
-import { getCategoriesForAI } from "../../models/Category.js";
+import { VaultRepo } from "../db/vault.repo.js";
+import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
+import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
 
 
 // ============================================================================
@@ -18,7 +20,7 @@ interface CategoryInfo {
   keywords: string[];
 }
 
-interface TopicAnalysis {
+export interface TopicAnalysis {
   topic: string;
   category: string;
   entryIds: string[];
@@ -31,7 +33,7 @@ interface AnalysisResult {
   synapses: SynapseLink[];
 }
 
-interface LongTermMemoryData {
+export interface LongTermMemoryData {
   summary: string;
   tags: string[];
 }
@@ -52,15 +54,8 @@ async function getDeltaEntries(userId: string): Promise<IVaultEntry[]> {
   // Only get entries that:
   // 1. Have NOT been analyzed yet, OR
   // 2. Had activity in the last 24 hours
-  const deltaEntries = await VaultEntry.find({
-    userId,
-    $or: [
-      { isAnalyzed: false },
-      { lastActivityAt: { $gte: twentyFourHoursAgo } },
-    ],
-  })
-    .sort({ lastActivityAt: -1 })
-    .limit(50); // Hard limit to prevent context explosion
+  const deltaEntries = await VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo)
+  
 
   return deltaEntries;
 }
@@ -71,15 +66,8 @@ async function getDeltaEntries(userId: string): Promise<IVaultEntry[]> {
  */
 async function getContextEntries(userId: string, excludeIds: string[]): Promise<IVaultEntry[]> {
   // Get top 20 strongest entries not in delta for context
-  const contextEntries = await VaultEntry.find({
-    userId,
-    _id: { $nin: excludeIds.map(id => new mongoose.Types.ObjectId(id)) },
-    isAnalyzed: true,
-    strength: { $gte: 3 }, // Only consider entries with some strength
-  })
-    .sort({ strength: -1, lastActivityAt: -1 })
-    .limit(20)
-    .select('_id summary rawText tags category');
+  const contextEntries = await VaultRepo.findContextEntries(userId, excludeIds)
+  
 
   return contextEntries;
 }
@@ -120,32 +108,12 @@ async function analyzeWithSynapses(
     .map(c => `${c.name}: ${c.description}`)
     .join('\n');
 
-  const prompt = `Analyze new entries (isNew=true) and find connections to existing ones.
-
-CATEGORIES:
-${categoryList}
-
-NEW ENTRIES (analyze these):
-${JSON.stringify(deltaSummaries, null, 1)}
-
-EXISTING ENTRIES (for context/connections):
-${JSON.stringify(contextSummaries, null, 1)}
-
-Return JSON with TWO arrays:
-{
-  "topics": [{"topic":"name","category":"category","entryIds":["id1"],"tags":["tag"],"importance":1-10}],
-  "synapses": [{"sourceId":"newEntryId","targetId":"anyEntryId","reason":"semantic reason why connected","strength":1-10}]
-}
-
-RULES for synapses:
-- sourceId MUST be from NEW entries (isNew=true)
-- targetId can be any entry (new or existing)
-- reason should explain the semantic connection (e.g., "Both discuss investment strategies")
-- strength: 1-3 weak, 4-6 moderate, 7-10 strong connection
-- Max 3 synapses per new entry
-- Only create meaningful connections, not everything
-
-Only valid JSON, no text.`;
+  const prompt = ANALYZE_WITH_SYNAPSES_PROMPT(
+    categoryList, 
+    JSON.stringify(deltaSummaries, null, 1),
+    JSON.stringify(contextSummaries, null, 1)
+  )
+  
 
   try {
     console.log('👁️ [Świadomość]    Wysyłam do AI:', deltaEntries.length, 'nowych +', contextEntries.length, 'kontekstowych');
@@ -194,14 +162,9 @@ async function createLongTermMemorySummary(
     tags: e.tags.slice(0, 3),
   }));
 
-  const prompt = `Consolidate these memories about "${topic}" (${categoryName}) into one summary.
+  const prompt = LONG_TERM_MEMORY_SUMMARY_PROMPT(topic, categoryName, JSON.stringify(entriesContent))
 
-Entries:
-${JSON.stringify(entriesContent)}
-
-Return JSON: {"summary":"max 300 words","tags":["tag1","tag2"]}
-
-Only valid JSON.`;
+  
 
   try {
 
@@ -219,11 +182,12 @@ Only valid JSON.`;
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
     
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = cleanAndParseJSON(content);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      throw new Error("create Long-Term Memory Error:")
+      return null
     }
-    return null;
+    return jsonMatch;
   } catch (error) {
     console.error('👁️ [Świadomość] ❌ Błąd tworzenia LTM:', error);
     return null;
@@ -245,14 +209,14 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
 
   try {
     // Load categories
-    const categories = await getCategoriesForAI();
+    const categories = await VaultRepo.getCategoriesForAI();
     if (categories.length === 0) {
       console.log('👁️ [Świadomość] ⚠️ Brak kategorii. Uruchom: npm run seed:categories');
       return stats;
     }
 
     // Get unique users
-    const userIds = await VaultEntry.distinct('userId');
+    const userIds = await VaultRepo.getUniqueUser()
     console.log(`👁️ [Świadomość] Przetwarzam ${userIds.length} użytkowników`);
 
     for (const userId of userIds) {
@@ -281,22 +245,10 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
 
         // Update entries with analysis results
         for (const topic of topics) {
-          const updateOps = topic.entryIds.map(id => ({
-            updateOne: {
-              filter: { _id: new mongoose.Types.ObjectId(id) },
-              update: {
-                $set: {
-                  category: topic.category,
-                  isAnalyzed: true,
-                },
-                $addToSet: { tags: { $each: topic.tags } },
-                $inc: { strength: topic.importance || 1, accessCount: 1 },
-              },
-            },
-          }));
+          const updateOps = VaultRepo.mapEntryIds(topic)
 
           if (updateOps.length > 0) {
-            await VaultEntry.bulkWrite(updateOps);
+            await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps)
             stats.analyzed += updateOps.length;
           }
         }
@@ -314,11 +266,7 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
       // STEP 2: CONSOLIDATE STRONG MEMORIES INTO LTM
       // Only process entries marked by subconscious (strength >= 10)
       // ========================================
-      const strongEntries = await VaultEntry.find({
-        userId,
-        strength: { $gte: 10 },
-        isConsolidated: false,
-      });
+      const strongEntries = await VaultRepo.findStrongEntries(userId)
 
       if (strongEntries.length > 0) {
         console.log(`👁️ [Świadomość]    Konsolidacja: ${strongEntries.length} silnych wspomnień`);
@@ -350,39 +298,31 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
           const memoryData = await createLongTermMemorySummary(entries, topic, category);
 
           if (memoryData) {
-            const categoryDoc = await Category.findOne({ name: category, isActive: true });
+            const categoryDoc = await VaultRepo.findCategoryDoc(category)
 
             // Check for existing memory
-            const existingMemory = await LongTermMemory.findOne({
-              userId,
-              topic,
-            });
+            const existingMemory = await VaultRepo.findExistingMemory(userId, topic)
 
             if (existingMemory) {
               existingMemory.summary = memoryData.summary;
               existingMemory.tags = [...new Set([...existingMemory.tags, ...memoryData.tags])];
               existingMemory.sourceEntryIds = entries.map(e => e._id);
-              await existingMemory.save();
+              await VaultRepo.saveExistingMemory(existingMemory)
               console.log(`👁️ [Świadomość]    ✅ Zaktualizowano istniejące LTM`);
             } else {
-              await LongTermMemory.create({
+              await VaultRepo.createNewLongTermMemory(
                 userId,
-                summary: memoryData.summary,
-                tags: memoryData.tags,
-                categoryId: categoryDoc?._id || null,
-                categoryName: category,
-                topic,
-                sourceEntryIds: entries.map(e => e._id),
-                strength: 10,
-              });
+                memoryData,
+                categoryDoc,
+                category,
+                entries,
+                topic
+              )
               console.log(`👁️ [Świadomość]    ✅ Utworzono nowe LTM`);
             }
 
             // Mark entries as consolidated
-            await VaultEntry.updateMany(
-              { _id: { $in: entries.map(e => e._id) } },
-              { $set: { isConsolidated: true } }
-            );
+            await VaultRepo.updateManyVaultEntries(entries)
 
             stats.consolidated += entries.length;
           }

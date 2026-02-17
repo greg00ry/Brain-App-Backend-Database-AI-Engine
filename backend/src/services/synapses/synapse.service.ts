@@ -8,7 +8,7 @@ import { VaultEntry } from '../../models/VaultEntry.js';
 
 //FOR FUTURE
 const INITIAL_SYNAPSE_WEIGHT = 0.3;
-const INITIAL_SYNAPSE_STABILITY = 0.1;
+const INITIAL_SYNAPSE_STABILITY = 0.5;
 const WEIGHT_INCREMENT = 0.15;
 
 
@@ -67,8 +67,8 @@ export async function fireSynapse(
     synapse = new Synapse({
       from,
       to,
-      weight: 0.3,
-      stability: 0.5,
+      weight: INITIAL_SYNAPSE_WEIGHT,
+      stability: INITIAL_SYNAPSE_STABILITY,
       lastFired: new Date(),
       reason
     });
