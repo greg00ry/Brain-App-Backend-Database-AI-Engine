@@ -225,50 +225,42 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
       // ========================================
       // STEP 1: ANALYZE DELTA + FIND SYNAPSES
       // ========================================
-      // ========================================
-// STEP 1: ANALYZE DELTA + FIND SYNAPSES
-// ========================================
-const deltaEntries = await getDeltaEntries(userId);
+      const deltaEntries = await getDeltaEntries(userId);
+      
+      if (deltaEntries.length === 0) {
+        console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
+      } else {
+        console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
 
-if (deltaEntries.length === 0) {
-  console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
-} else {
-  console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
+        // Get context entries for synapse discovery
+        const deltaIds = deltaEntries.map(e => e._id.toString());
+        const contextEntries = await getContextEntries(userId, deltaIds);
+        console.log(`👁️ [Świadomość]    Kontekst: ${contextEntries.length} istniejących wpisów`);
 
-  // --- START BATCHING ---
-  const BATCH_SIZE = 5; // Bezpieczna ilość, żeby DeepSeek nie wypluł za długiego JSONa
-  for (let i = 0; i < deltaEntries.length; i += BATCH_SIZE) {
-    const currentBatch = deltaEntries.slice(i, i + BATCH_SIZE);
-    console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
+        // Analyze with AI - get both topics and synapses
+        const analysisResult = await analyzeWithSynapses(deltaEntries, contextEntries, categories);
+        const { topics, synapses } = analysisResult;
+        
+        console.log(`👁️ [Świadomość]    Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
 
-    // Get context entries for synapse discovery
-    const deltaIds = currentBatch.map(e => e._id.toString());
-    const contextEntries = await getContextEntries(userId, deltaIds);
-    
-    // ANALIZA POJEDYNCZEJ PACZKI
-    const analysisResult = await analyzeWithSynapses(currentBatch, contextEntries, categories);
-    const { topics, synapses } = analysisResult;
-    
-    console.log(`👁️ [Batch] Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
+        // Update entries with analysis results
+        for (const topic of topics) {
+          const updateOps = VaultRepo.mapEntryIds(topic)
 
-    // Aktualizacja wpisów wynikami z paczki
-    for (const topic of topics) {
-      const updateOps = VaultRepo.mapEntryIds(topic);
-      if (updateOps.length > 0) {
-        await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps);
-        stats.analyzed += updateOps.length;
+          if (updateOps.length > 0) {
+            await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps)
+            stats.analyzed += updateOps.length;
+          }
+        }
+
+        // Process AI-discovered synapses (with max limit per entry)
+        if (synapses.length > 0) {
+          console.log(`👁️ [Świadomość]    🔗 Przetwarzam ${synapses.length} synaps od AI...`);
+          const deltaIdSet = new Set(deltaIds);
+          const synapsesCreated = await processSynapseLinks(synapses, deltaIdSet);
+          stats.synapsesCreated += synapsesCreated;
+        }
       }
-    }
-
-    // Procesowanie synaps z paczki
-    if (synapses.length > 0) {
-      const deltaIdSet = new Set(deltaIds);
-      const synapsesCreated = await processSynapseLinks(synapses, deltaIdSet);
-      stats.synapsesCreated += synapsesCreated;
-    }
-  }
-  // --- END BATCHING ---
-}
 
       // ========================================
       // STEP 2: CONSOLIDATE STRONG MEMORIES INTO LTM

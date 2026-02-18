@@ -7,6 +7,7 @@ import { connectDB } from "./config/db.js";
 //Routery
 import entriesRouter from "./routes/entries.js"
 import analyzeRouter from "./routes/analyze.js"
+import authRouter from "./routes/auth.js"
 
 //Jobs
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
@@ -24,6 +25,7 @@ app.use(express.json())
 //Routes
 app.use("/api/entries", entriesRouter)
 app.use("/api/analyze", analyzeRouter)
+app.use("/api/auth", authRouter)
 
 //Health check
 app.get("/api/health", (_req, res) => {
@@ -41,6 +43,7 @@ async function start() {
         🚀 SYSTEM "THE BRAIN" GOTOWY
 ----------------------------------
 📍 Port: ${PORT}
+⚙️ Auth: /api/auth
 🧠 Analiza: /api/analyze
 ⚙️ Health:  /api/health
 🌙 Cron:    03:00 rano

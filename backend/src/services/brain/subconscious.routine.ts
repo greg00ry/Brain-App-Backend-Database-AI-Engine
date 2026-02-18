@@ -79,10 +79,12 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     
     const pruneResult = await VaultRepo.pruneResults()
     
-    stats.pruned = pruneResult.deletedCount;
+    stats.pruned  = (pruneResult.deadEntries?.deletedCount || 0) + (pruneResult.deadSynapses?.deletedCount || 0);
     if (stats.pruned > 0) {
-      console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} zapomnianych wspomnień`);
-    }
+  console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} elementów (wpisy + synapsy)`);
+  
+  
+}
 
     // ========================================
     // PHASE 3: MARK FOR CONSOLIDATION

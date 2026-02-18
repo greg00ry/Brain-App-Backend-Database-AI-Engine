@@ -7,7 +7,7 @@ import { Dashboard } from './components/Dashboard.tsx'
 import axios from 'axios'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false) 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false)
 
@@ -50,7 +50,7 @@ function App() {
         } catch (error) {
           console.error("Błąd weryfikacji tokenu:", error)
           localStorage.removeItem("token")
-          setIsLoggedIn(false)
+          setIsLoggedIn(false) 
         }
       }
     }

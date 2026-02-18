@@ -5,7 +5,9 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post("/",requireAuth ,validateText, analyzeController)
+
+//dodac middleware require auth
+router.post("/",requireAuth, validateText, analyzeController)
 
 export default router
 

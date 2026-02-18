@@ -3,6 +3,7 @@ import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js"
 import { Category, ICategory } from "../../models/Category.js";
 import { TopicAnalysis, LongTermMemoryData } from "../brain/conscious.processor.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
+import { ISynapse, Synapse } from "../../models/Synapse.js";
 
 export const VaultRepo = {
      async getCategoriesForAI(): Promise<{ name: string; description: string; keywords: string[] }[]> {
@@ -124,10 +125,27 @@ export const VaultRepo = {
         return await VaultEntry.bulkWrite(decayOps);
     },
     async pruneResults() {
-        return await VaultEntry.deleteMany({
-            strength: { $lte: 0 },
-            isConsolidated: false, // Never delete consolidated entries
-        });
+        // 1. Usuwamy martwe wpisy z Vaulta (to już masz)
+    const deadEntries = await VaultEntry.deleteMany({
+        strength: { $lte: 0 },
+        isConsolidated: false, 
+    });
+
+    // 2. USUWANIE SYNAPS (Tego brakowało!)
+    // Usuwamy synapsy, których waga/siła spadła do zera
+    const deadSynapses = await Synapse.deleteMany({
+        weight: { $lte: 0.1 } // Próg odcięcia - do doprecyzowania
+    });
+
+    
+    
+
+    console.log(`🧹 [Podświadomość] Deep Clean: 
+        - Wpisy: ${deadEntries.deletedCount}
+        - Synapsy: ${deadSynapses.deletedCount}`);
+    
+    return { deadEntries, deadSynapses };
+
     },
     async markStrongEntries() {
         return await VaultEntry.find({
