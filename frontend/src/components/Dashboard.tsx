@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
-import NeuralConsole from "../components/NeuralConsole"; // Twój główny czat
-import TrainingCenter from "../components/TrainingCenter"; // Moduł treningowy z terminalem
-import MemoryVault from "../components/MemoryVault"; // Nowy moduł MongoDB Vault
+import NeuralConsole from "../components/NeuralConsole";
+import TrainingCenter from "../components/TrainingCenter";
+import MemoryVault from "../components/MemoryVault";
+import NeuralMap from "../components/NeuralMap"; // Importujemy nową mapę
 
 const Dashboard: React.FC = () => {
-    // Stan zarządzający aktywną zakładką
+    // Stan zarządzający wszystkimi widokami
     const [activeTab, setActiveTab] = useState<string>("console");
 
-    // Funkcja renderująca odpowiedni moduł w zależności od wyboru w Sidebarze
     const renderContent = () => {
         switch (activeTab) {
             case "console":
@@ -18,6 +18,8 @@ const Dashboard: React.FC = () => {
                 return <TrainingCenter />;
             case "vault":
                 return <MemoryVault />;
+            case "map":
+                return <NeuralMap />; // <--- NOWY WIDOK PODPIĘTY
             default:
                 return <NeuralConsole />;
         }
@@ -25,13 +27,11 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-slate-950 text-white overflow-hidden">
-            {/* Przekazujemy funkcję zmiany zakładki do Sidebaru */}
+            {/* Sidebar dostaje activeTab, żeby wiedzieć, który przycisk podświetlić */}
             <Sidebar onTabChange={setActiveTab} activeTab={activeTab} />
             
             <div className="flex flex-col flex-1">
                 <Header />
-                
-                {/* Dynamiczny kontener na treść */}
                 <main className="flex-1 flex flex-col overflow-hidden">
                     {renderContent()}
                 </main>
