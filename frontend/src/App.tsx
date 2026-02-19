@@ -4,10 +4,12 @@ import { LogginForm } from './components/LogginForm.tsx'
 import { RegisterForm } from './components/RegisterForm.tsx'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Dashboard } from './components/Dashboard.tsx'
+import { Navigate } from 'react-router-dom'
 import axios from 'axios'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false) 
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(true) 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false)
 
@@ -30,32 +32,33 @@ function App() {
 
   useEffect(() => {
     const verifyToken = async () => {
-      const token = localStorage.getItem("token")
-      if (token) {
-        try {
-          const response = await axios.post(
-            "http://localhost:3001/api/auth/verify",
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              },
-            }
-          )
-          console.log(response);
-          
-          if (response.status === 200) {
-            setIsLoggedIn(true)
-          }
-        } catch (error) {
-          console.error("Błąd weryfikacji tokenu:", error)
-          localStorage.removeItem("token")
-          setIsLoggedIn(false) 
-        }
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setIsVerifying(false);
+        return;
       }
-    }
-    verifyToken()
-  },[])
+      try {
+        const response = await axios.post("http://localhost:3001/api/auth/verify", {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.status === 200) setIsLoggedIn(true);
+      } catch (error) {
+        localStorage.removeItem("token");
+        setIsLoggedIn(false);
+      } finally {
+        setIsVerifying(false); // Kończymy weryfikację niezależnie od wyniku
+      }
+    };
+    verifyToken();
+  }, []);
+
+  if (isVerifying) {
+    return (
+      <div className="h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   //dodac 3 stan zeby usunąć pol sekundowe wylogowanie
   //dodac ochrone sciezek jak niezalogowany powrot na landing
@@ -68,10 +71,16 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
+          <Route path="/" element={
+            isLoggedIn ? <Navigate to="/dashboard" /> : <Landing onStartClick={handleOpenLoginModal} />
+          } />
+          
+          <Route path="/dashboard" element={
+            isLoggedIn ? <Dashboard /> : <Navigate to="/" />
+          } />
+        </Routes>
+        
           {/* Landing Page */}
-          <Route
-            path="/"
-            element={
               <>
                 <Landing onStartClick={handleOpenLoginModal} />
                 {isLoginModalOpen && (
@@ -80,7 +89,7 @@ function App() {
                       <button
                         onClick={handleCloseLoginModal}
                         className="absolute top-4 left-20 text-gray-500 hover:text-gray-800"
-                      >
+                        >
                         X
                       </button>
                       <h2 className="text-xl font-bold mb-4">Zaloguj się</h2>
@@ -97,7 +106,7 @@ function App() {
                       <button
                         onClick={handleCloseRegisterModal}
                         className="absolute top-4 left-20 text-gray-500 hover:text-gray-800"
-                      >
+                        >
                         X
                       </button>
                       <h2 className="text-xl font-bold mb-4">Zarejestruj się</h2>
@@ -105,21 +114,7 @@ function App() {
                     </div>
                   </div>
                 )}
-              </>
-            }
-          />
-          {/* Dashboard */}
-          <Route path="/dashboard" element={
-              isLoggedIn ? (
-                <Dashboard />
-              ) : (
-                <div className="text-center mt-10">
-                  <h2 className="text-2xl font-bold">Nie jesteś zalogowany!</h2>
-                  <p>Proszę zalogować się, aby uzyskać dostęp do dashboardu.</p>
-                </div>
-              )
-            } />
-        </Routes>
+              </> 
       </div>
     </Router>
   )
