@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Brain, Activity, Send, User } from 'lucide-react';
-import Sidebar from "./Sidebar"
+import { Brain, Send, User } from 'lucide-react';
+import Sidebar from "./Sidebar.tsx"
+import Header from "./Header.tsx";
 import axios from "axios";
 
 const Dashboard: React.FC = () => {
@@ -42,17 +43,7 @@ const Dashboard: React.FC = () => {
       {/* GŁÓWNA STRONA - NEURAL CHAT */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
-        {/* TOP BAR */}
-        <header className="h-16 border-b border-white/10 bg-white/5 flex items-center justify-between px-8">
-            <div className="flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Neural Link Active</span>
-            </div>
-            <div className="text-slate-400 text-sm font-mono flex items-center gap-2">
-                <Activity size={14} className="text-purple-500" />
-                <span className="text-xs">Processing via Nano-Transformer</span>
-            </div>
-        </header>
+        <Header />
 
         {/* MESSAGES AREA */}
         <section className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
