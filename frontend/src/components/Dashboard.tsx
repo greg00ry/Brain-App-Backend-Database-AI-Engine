@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Layout, Database, Brain, Terminal, Settings, Activity, Send, User } from 'lucide-react';
+import { Brain, Activity, Send, User } from 'lucide-react';
+import Sidebar from "./Sidebar"
 import axios from "axios";
 
 const Dashboard: React.FC = () => {
@@ -36,30 +37,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-slate-200 font-sans">
       
-      {/* SIDEBAR - Zostaje bez zmian zgodnie z planem */}
-      <aside className="w-64 border-r border-white/10 bg-white/5 flex flex-col">
-        <div className="p-6 flex items-center gap-3 border-b border-white/10">
-          <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-            <Brain size={20} className="text-white" />
-          </div>
-          <h1 className="font-bold tracking-tight text-white">THE BRAIN <span className="text-[10px] text-purple-400 font-mono ml-1 text-xs">v1.0</span></h1>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-          <NavItem icon={<Layout size={18} />} label="Neural Console" active />
-          <NavItem icon={<Database size={18} />} label="Memory Vault" />
-          <NavItem icon={<Brain size={18} />} label="Inference Engine" />
-          <NavItem icon={<Activity size={18} />} label="Activity Trace" />
-        </nav>
-
-        <div className="p-4 border-t border-white/10 space-y-2">
-          <NavItem icon={<Settings size={18} />} label="Neural Link" />
-          <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-             <div className="text-[10px] text-purple-400 font-bold uppercase mb-1">Local Engine</div>
-             <div className="text-xs text-slate-300">Connected & Synced</div>
-          </div>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* GŁÓWNA STRONA - NEURAL CHAT */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
