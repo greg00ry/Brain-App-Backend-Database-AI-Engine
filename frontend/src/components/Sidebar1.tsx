@@ -1,18 +1,14 @@
 import React from "react";
-import { Layout, Database, Brain, Activity, Settings, PenTool } from 'lucide-react';
+import { Layout, Database, Brain, Activity, Settings } from 'lucide-react';
 
 interface NavItemProps {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
-  onClick?: () => void;
 }
 
-// Pomocniczy komponent przycisku nawigacji
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false, onClick }) => (
-  <div 
-    onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all ${
+const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false }) => (
+  <div className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all ${
     active 
       ? 'bg-purple-600/20 text-purple-400 border border-purple-500/20' 
       : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
@@ -22,15 +18,9 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false, onClick 
   </div>
 );
 
-interface SidebarProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-}
-
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 border-r border-white/10 bg-white/5 flex flex-col shrink-0">
-      {/* LOGO SEKCJA */}
       <div className="p-6 flex items-center gap-3 border-b border-white/10">
         <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
           <Brain size={20} className="text-white" />
@@ -40,35 +30,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         </h1>
       </div>
       
-      {/* GŁÓWNA NAWIGACJA */}
       <nav className="flex-1 p-4 space-y-2">
-        <NavItem 
-          icon={<Layout size={18} />} 
-          label="Neural Console" 
-          active={activeTab === "console"}
-          onClick={() => onTabChange("console")} 
-        />
-        <NavItem 
-          icon={<PenTool size={18} />} 
-          label="Training Unit" 
-          active={activeTab === "training"}
-          onClick={() => onTabChange("training")}
-        />
-        <NavItem 
-          icon={<Database size={18} />} 
-          label="Memory Vault" 
-          active={activeTab === "vault"}
-          onClick={() => onTabChange("vault")}
-        />
-        <NavItem 
-          icon={<Brain size={18} />} 
-          label="Neural Map" 
-          active={activeTab === "map"}
-          onClick={() => onTabChange("map")}
-        />
+        <NavItem icon={<Layout size={18} />} label="Neural Console" active />
+        <NavItem icon={<Database size={18} />} label="Memory Vault" />
+        <NavItem icon={<Brain size={18} />} label="Neural Map" />
+        <NavItem icon={<Activity size={18} />} label="Activity Trace" />
       </nav>
 
-      {/* SEKCJA OSTATNICH WPISÓW (Recent Synapses) */}
       <div className="px-4 py-6">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 px-2">
           Recent Synapses
@@ -83,7 +51,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         </div>
       </div>
 
-      {/* STOPKA SIDEBARU */}
       <div className="p-4 border-t border-white/10 space-y-2">
         <NavItem icon={<Settings size={18} />} label="Neural Link" />
         <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
