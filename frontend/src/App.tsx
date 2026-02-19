@@ -3,7 +3,7 @@ import { Landing } from './components/Landing.tsx'
 import { LogginForm } from './components/LogginForm.tsx'
 import { RegisterForm } from './components/RegisterForm.tsx'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Dashboard } from './components/Dashboard.tsx'
+import Dashboard from './components/Dashboard.tsx'
 import { Navigate } from 'react-router-dom'
 import axios from 'axios'
 

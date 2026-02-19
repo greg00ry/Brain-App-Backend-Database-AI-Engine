@@ -74,6 +74,32 @@ const TrainingCenter: React.FC = () => {
                     </div>
                 </div>
 
+                                {/* RAW TERMINAL UNIT - FULL WIDTH */}
+                <div className="mt-8 w-full bg-[#0d1117]/90 border border-white/5 font-mono shadow-2xl rounded-xl overflow-hidden">
+                {/* TREŚĆ LOGÓW - BEZ PASKÓW, SAMA ESENCJA */}
+                <div className="p-5 h-64 overflow-y-auto text-[13px] leading-relaxed scrollbar-thin scrollbar-thumb-slate-800">
+                    <div className="flex gap-2 mb-3">
+                    <span className="text-green-500">➜</span>
+                    <span className="text-blue-400">~/the-brain/neural-engine</span>
+                    <span className="text-slate-400">git:(</span><span className="text-red-400">main</span><span className="text-slate-400">)</span>
+                    <span className="text-slate-200">npm run train:consolidate</span>
+                    </div>
+                    
+                    <div className="space-y-1">
+                    <p className="text-slate-500"><span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span> <span className="text-purple-400">INIT</span> LTM sequence start...</p>
+                    <p className="text-slate-500"><span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span> <span className="text-blue-400">PROC</span> Tokenizing input stream (length: {note.length})...</p>
+                    <p className="text-slate-500"><span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span> <span className="text-blue-400">KERN</span> Mapping synapses to vector space...</p>
+                    <p className="text-slate-500"><span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span> <span className="text-green-500">OK</span> Cluster #A1-99 synchronized.</p>
+                    <p className="text-slate-500"><span className="text-slate-600">[{new Date().toLocaleTimeString()}]</span> <span className="text-yellow-400">WARN</span> Cognitive overlap detected in 'Architecture' node.</p>
+                    <div className="flex gap-2 mt-2">
+                        <span className="text-green-500">➜</span>
+                        <span className="text-blue-400">~/the-brain/neural-engine</span>
+                        <span className="animate-pulse w-2 h-4 bg-slate-500 inline-block"></span>
+                    </div>
+                    </div>
+                </div>
+                </div>
+                
                 {status === 'success' && (
                     <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-500 text-sm text-center">
                         Notatka została pomyślnie przetworzona i dodana do synaps.
