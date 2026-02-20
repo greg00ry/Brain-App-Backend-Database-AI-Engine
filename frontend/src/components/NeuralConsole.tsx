@@ -23,34 +23,80 @@ const NeuralConsole: React.FC = () => {
     }, [messages]);
 
     const handleSendMessage = async (e: React.SyntheticEvent) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading) return;
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-        const userMessage: Message = { id: messages.length + 1, text: input, sender: 'user' };
-        setMessages(prev => [...prev, userMessage]);
-        setInput("");
-        setIsLoading(true); // Włączamy ładowanie
+    // 1. Dodajemy wiadomość użytkownika do chatu
+    const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
 
-        const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
-        try {
-            // Tutaj w przyszłości będzie Twoje API do AI (Express + Python)
-            const response = await axios.post("http://localhost:3001/api/chat", {
-                query: input
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+    // 2. Przygotowujemy pustą wiadomość od AI, którą będziemy wypełniać w locie
+    const aiMessageId = Date.now() + 1;
+    setMessages(prev => [...prev, { id: aiMessageId, text: "", sender: 'ai' }]);
 
-            const aiMessage: Message = { id: messages.length + 2, text: response.data.response, sender: 'ai' };
-            setMessages(prev => [...prev, aiMessage]);
-        } catch (error) {
-            console.error("Chat error:", error);
-            const errorMessage: Message = { id: messages.length + 2, text: "Przepraszam, wystąpił błąd w neuronach. Spróbuj ponownie.", sender: 'ai' };
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
-            setIsLoading(false); // Wyłączamy ładowanie niezależnie od wyniku
+    try {
+        // Używamy fetch, bo axios nie wspiera ReadableStream tak łatwo
+        const response = await fetch("http://localhost:3001/api/chat/stream", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ messages: [{ role: 'user', content: input }] })
+        });
+
+        if (!response.body) throw new Error("Brak strumienia danych");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = "";
+
+        // 3. Pętla czytająca strumień z Node.js (który idzie z Pythona)
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            
+            // Nasz Python wysyła format SSE: "data: {"content": "słowo"}\n\n"
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const jsonStr = line.replace('data: ', '');
+                        const data = JSON.parse(jsonStr);
+                        
+                        if (data.content) {
+                            accumulatedText += data.content;
+                            
+                            // 4. Kluczowy moment: aktualizujemy stan wiadomości AI o nowy fragment tekstu
+                            setMessages(prev => prev.map(msg => 
+                                msg.id === aiMessageId 
+                                    ? { ...msg, text: accumulatedText } 
+                                    : msg
+                            ));
+                        }
+                    } catch (err) {
+                        // Ignorujemy błędy parsowania (czasem chunk przychodzi ucięty w połowie JSONa)
+                    }
+                }
+            }
         }
-    };
+    } catch (error) {
+        console.error("Błąd streamingu:", error);
+        setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+                ? { ...msg, text: "Błąd połączenia z Neural Engine." } 
+                : msg
+        ));
+    } finally {
+        setIsLoading(false);
+    }
+};
 
     return (
         <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden">

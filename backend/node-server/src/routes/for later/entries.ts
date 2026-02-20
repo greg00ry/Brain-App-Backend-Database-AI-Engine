@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { VaultEntry } from '../models/VaultEntry.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { VaultEntry } from '../../models/VaultEntry.js';
+import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 
 const router = Router();
 

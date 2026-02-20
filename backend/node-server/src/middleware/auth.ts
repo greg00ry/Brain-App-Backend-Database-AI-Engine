@@ -7,7 +7,7 @@ export interface AuthRequest extends Request {
 }
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  passport.authenticate('jwt', { session: false }, (err: Error, user: IUser) => {
+  passport.authenticate('jwt', { session: false }, (err: any, user: IUser) => {
     if (err) {
       return res.status(500).json({ error: 'Authentication error' });
     }

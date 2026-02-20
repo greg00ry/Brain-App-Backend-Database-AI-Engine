@@ -5,9 +5,10 @@ import cron from "node-cron"
 import { connectDB } from "./config/db.js";
 
 //Routery
-import entriesRouter from "./routes/entries.js"
+import entriesRouter from "./routes/for later/entries.js"
 import analyzeRouter from "./routes/analyze.js"
 import authRouter from "./routes/auth.js"
+import brainChatRouter from "./routes/brainChat.js"
 
 //Jobs
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
@@ -26,6 +27,7 @@ app.use(express.json())
 app.use("/api/entries", entriesRouter)
 app.use("/api/analyze", analyzeRouter)
 app.use("/api/auth", authRouter)
+app.use("/api/chat", brainChatRouter)
 
 //Health check
 app.get("/api/health", (_req, res) => {

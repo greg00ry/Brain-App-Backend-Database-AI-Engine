@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { Synapse } from '../models/Synapse.js';
-import { VaultEntry } from '../models/VaultEntry.js';
+import { requireAuth, AuthRequest } from '../../middleware/auth.js';
+import { Synapse } from '../../models/Synapse.js';
+import { VaultEntry } from '../../models/VaultEntry.js';
 import {
   fireSynapse,
   fireMultipleSynapses,
@@ -9,7 +9,7 @@ import {
   getSynapseStats,
   weakenSynapse,
   getStrongestSynapses,
-} from '../services/synapses/synapse.service.js';
+} from '../../services/synapses/synapse.service.js';
 
 const router = Router();
 

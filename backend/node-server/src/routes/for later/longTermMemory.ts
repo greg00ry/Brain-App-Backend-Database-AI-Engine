@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { LongTermMemory } from '../models/LongTermMemory.js';
-import { Category } from '../models/Category.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { LongTermMemory } from '../../models/LongTermMemory.js';
+import { Category } from '../../models/Category.js';
+import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 
 const router = Router();
 

@@ -3,9 +3,9 @@ import {
   runVaultProcessorNow, 
   runSubconsciousNow, 
   runConsciousNow 
-} from '../jobs/brain.orchestrator.js';
+} from '../../jobs/brain.orchestrator.js';
 //import { triggerDreamingMode, getDreamingStats } from '../jobs/dreamingMode.js';
-import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { requireAuth, AuthRequest } from '../../middleware/auth.js';
 
 const router = Router();
 
