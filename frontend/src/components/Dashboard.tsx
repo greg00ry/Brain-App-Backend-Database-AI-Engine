@@ -4,10 +4,9 @@ import Header from "../components/Header";
 import NeuralConsole from "../components/NeuralConsole";
 import TrainingCenter from "../components/TrainingCenter";
 import MemoryVault from "../components/MemoryVault";
-import NeuralMap from "../components/NeuralMap"; // Importujemy nową mapę
+import NeuralMap from "../components/NeuralMap";
 
 const Dashboard: React.FC = () => {
-    // Stan zarządzający wszystkimi widokami
     const [activeTab, setActiveTab] = useState<string>("console");
 
     const renderContent = () => {
@@ -19,7 +18,7 @@ const Dashboard: React.FC = () => {
             case "vault":
                 return <MemoryVault />;
             case "map":
-                return <NeuralMap />; // <--- NOWY WIDOK PODPIĘTY
+                return <NeuralMap />;
             default:
                 return <NeuralConsole />;
         }
@@ -27,12 +26,10 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-slate-950 text-white overflow-hidden">
-            {/* Sidebar dostaje activeTab, żeby wiedzieć, który przycisk podświetlić */}
             <Sidebar onTabChange={setActiveTab} activeTab={activeTab} />
-            
-            <div className="flex flex-col flex-1">
+            <div className="flex flex-col flex-1 min-w-0">
                 <Header />
-                <main className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 flex flex-col overflow-hidden min-h-0">
                     {renderContent()}
                 </main>
             </div>

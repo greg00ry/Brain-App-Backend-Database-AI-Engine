@@ -5,10 +5,11 @@ import cron from "node-cron"
 import { connectDB } from "./config/db.js";
 
 //Routery
-import entriesRouter from "./routes/for later/entries.js"
+import entriesRouter from "./routes/entries.js"
 import analyzeRouter from "./routes/analyze.js"
 import authRouter from "./routes/auth.js"
 import brainChatRouter from "./routes/brainChat.js"
+
 
 //Jobs
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
@@ -33,6 +34,8 @@ app.use("/api/chat", brainChatRouter)
 app.get("/api/health", (_req, res) => {
   res.json({status: "ok", timestamp: new Date().toISOString(), system: "The Brain App"})
 })
+
+
 
 //Start server
 async function start() {
