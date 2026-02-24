@@ -5,7 +5,13 @@ export const saveAnalyzedEntry = async (userId: string, rawText: string, analysi
     const entry = new VaultEntry({
         userId,
         rawText,
-        ...analysis
+        analysis: {
+            summary: analysis.summary,
+            tags: analysis.tags,
+            strength: analysis.strength,
+            category: analysis.category,
+            isProcessed: analysis.isProcessed
+        }
     })
     return await entry.save()
 }

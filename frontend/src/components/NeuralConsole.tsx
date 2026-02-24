@@ -38,7 +38,7 @@ const NeuralConsole: React.FC = () => {
 
         try {
             // 3. Wysyłamy do endpointu ze streamingiem
-            const response = await fetch("http://localhost:3001/api/intent/stream", {
+            const response = await fetch("http://localhost:3001/api/intent", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,

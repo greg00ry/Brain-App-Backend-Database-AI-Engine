@@ -1,6 +1,8 @@
+import dotenv from "dotenv"
+dotenv.config()
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv"
 import cron from "node-cron"
 import { connectDB } from "./config/db.js";
 
@@ -16,7 +18,9 @@ import actionRouter from "./routes/actions.route.js"
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
 import { timeStamp } from "console";
 
-dotenv.config()
+console.log("----------------------------------");
+console.log("📧 Konfiguracja SMTP:", process.env.SMTP_USER ? "Wczytana ✅" : "BRAK ❌");
+console.log("----------------------------------");
 
 const app = express()
 const PORT = process.env.PORT || 3001 

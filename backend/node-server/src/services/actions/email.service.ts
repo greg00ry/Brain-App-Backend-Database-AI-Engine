@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 
-// ─── Config ───────────────────────────────────────────────────────────────────
 
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
@@ -32,8 +31,16 @@ let transporter: Transporter | null = null;
 
 /**
  * Inicjalizuje transporter Nodemailer (lazy initialization)
- */
+*/
 function getTransporter(): Transporter {
+  
+  // ─── Config ───────────────────────────────────────────────────────────────────
+  const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+  const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+  const SMTP_USER = process.env.SMTP_USER;
+  const SMTP_PASS = process.env.SMTP_PASS;
+  const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
+
   if (!transporter) {
     if (!SMTP_USER || !SMTP_PASS) {
       throw new Error("SMTP_USER and SMTP_PASS must be configured in environment");
@@ -42,7 +49,6 @@ function getTransporter(): Transporter {
     transporter = nodemailer.createTransport({
       host: SMTP_HOST,
       port: SMTP_PORT,
-      secure: SMTP_PORT === 465, // true dla 465, false dla innych portów
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
