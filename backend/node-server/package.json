@@ -12,6 +12,7 @@
     "seed:test": "tsx src/scripts/seedTest.ts"
   },
   "dependencies": {
+    "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

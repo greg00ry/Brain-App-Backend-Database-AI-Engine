@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Brain, Loader2 } from 'lucide-react';
-import axios from "axios";
 
 // Typ dla wiadomości, może być rozbudowany o role (user/ai), timestamp, itp.
 interface Message {
@@ -29,63 +28,50 @@ const NeuralConsole: React.FC = () => {
     // 1. Dodajemy wiadomość użytkownika do chatu
     const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input;
     setInput("");
     setIsLoading(true);
 
     const token = localStorage.getItem("token");
 
-    // 2. Przygotowujemy pustą wiadomość od AI, którą będziemy wypełniać w locie
+    // 2. Przygotowujemy pustą wiadomość od AI
     const aiMessageId = Date.now() + 1;
     setMessages(prev => [...prev, { id: aiMessageId, text: "", sender: 'ai' }]);
 
     try {
-        // Używamy fetch, bo axios nie wspiera ReadableStream tak łatwo
-        const response = await fetch("http://localhost:3001/api/chat/stream", {
+        const response = await fetch("http://localhost:3001/api/intent", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token}`,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ messages: [{ role: 'user', content: input }] })
+            body: JSON.stringify({ 
+                text: userInput  // ← Zmienione z 'messages' na 'text'
+            })
         });
 
-        if (!response.body) throw new Error("Brak strumienia danych");
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedText = "";
-
-        // 3. Pętla czytająca strumień z Node.js (który idzie z Pythona)
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            
-            // Nasz Python wysyła format SSE: "data: {"content": "słowo"}\n\n"
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const jsonStr = line.replace('data: ', '');
-                        const data = JSON.parse(jsonStr);
-                        
-                        if (data.content) {
-                            accumulatedText += data.content;
-                            
-                            // 4. Kluczowy moment: aktualizujemy stan wiadomości AI o nowy fragment tekstu
-                            setMessages(prev => prev.map(msg => 
-                                msg.id === aiMessageId 
-                                    ? { ...msg, text: accumulatedText } 
-                                    : msg
-                            ));
-                        }
-                    } catch (err) {
-                        // Ignorujemy błędy parsowania (czasem chunk przychodzi ucięty w połowie JSONa)
-                    }
-                }
-            }
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Błąd z backendu:", errorText);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        // Backend zwraca JSON, nie stream!
+        // Więc zamiast streamowania, po prostu odczytaj odpowiedź:
+        const result = await response.json();
+        
+        console.log("Otrzymana odpowiedź:", result);
+        
+        // Aktualizuj wiadomość AI z otrzymaną odpowiedzią
+        setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+                ? { 
+                    ...msg, 
+                    text: `Akcja: ${result.action}\nUzasadnienie: ${result.reasoning}` 
+                  } 
+                : msg
+        ));
+        
     } catch (error) {
         console.error("Błąd streamingu:", error);
         setMessages(prev => prev.map(msg => 
