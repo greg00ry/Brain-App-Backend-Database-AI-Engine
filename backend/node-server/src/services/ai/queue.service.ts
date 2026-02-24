@@ -1,4 +1,4 @@
-import { proccessAndStore } from "./ingest.service.js";
+import { proccessAndStore } from "../ingest/ingest.service.js";
 
 interface QueueTask {
   id: string;

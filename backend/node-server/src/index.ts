@@ -10,6 +10,7 @@ import analyzeRouter from "./routes/analyze.js"
 import authRouter from "./routes/auth.js"
 import intentRouter from "./routes/intent.route.js"
 
+
 //Jobs
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
 import { timeStamp } from "console";
