@@ -21,7 +21,7 @@ const vaultEntrySchema = new mongoose.Schema({
   },
   
   analysis: {
-    summary: { type: String, required: true },
+    summary: { type: String},
     tags: [{ type: String }],
     strength: { type: Number, min: 0, max: 10 },
     category: { type: String },

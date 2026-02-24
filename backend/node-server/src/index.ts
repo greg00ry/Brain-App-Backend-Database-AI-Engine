@@ -30,7 +30,7 @@ app.use("/api/entries", entriesRouter)
 app.use("/api/analyze", analyzeRouter)
 app.use("/api/auth", authRouter)
 app.use("/api/intent", intentRouter)
-app.use("api/actions", actionRouter)
+app.use("/api/actions", actionRouter)
 
 //Health check
 app.get("/api/health", (_req, res) => {
