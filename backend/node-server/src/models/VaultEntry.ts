@@ -1,74 +1,122 @@
-import mongoose, { Document, Schema, Types } from 'mongoose';
+import mongoose from "mongoose";
 
-export interface IVaultEntry extends Document {
-  _id: Types.ObjectId;
-  userId: string;
+/**
+ * Rozszerzone Entry Schema z Action Tools
+ * 
+ * Dodaj to do swojego istniejącego Entry.model.ts
+ */
+
+const vaultEntrySchema = new mongoose.Schema({
+  // ─── Istniejące pola (nie zmieniaj) ────────────────────────────────────────
+  
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  
+  rawText: { 
+    type: String, 
+    required: true 
+  },
+  
+  analysis: {
+    summary: { type: String, required: true },
+    tags: [{ type: String }],
+    strength: { type: Number, min: 0, max: 10 },
+    category: { type: String },
+    isProcessed: { type: Boolean, default: false }
+  },
+
+  // ─── NOWE POLE: Action Tools ───────────────────────────────────────────────
+  // Dodaj to poniżej istniejących pól
+  
+  actionTools: {
+    // Search action (Tavily)
+    search: {
+      completed: { type: Boolean, default: false },
+      facts: [{ type: String }],
+      searchResults: { type: String },
+      sources: [{ type: String }],
+      timestamp: { type: Date },
+      error: { type: String }
+    },
+    
+    // Email action (Nodemailer)
+    email: {
+      completed: { type: Boolean, default: false },
+      sent: { type: Boolean, default: false },
+      messageId: { type: String },
+      recipient: { type: String },
+      timestamp: { type: Date },
+      error: { type: String }
+    }
+  },
+
+  // ─── Timestamps ────────────────────────────────────────────────────────────
+  
+  createdAt: { 
+    type: Date, 
+    default: Date.now 
+  },
+  
+  updatedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
+});
+
+// Index dla szybszego wyszukiwania wpisów z action tools
+vaultEntrySchema.index({ userId: 1, "actionTools.search.completed": 1 });
+vaultEntrySchema.index({ userId: 1, "actionTools.email.completed": 1 });
+vaultEntrySchema.index({ userId: 1, createdAt: -1 });
+
+// Middleware: aktualizuj updatedAt przy każdej modyfikacji
+vaultEntrySchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+vaultEntrySchema.pre('findOneAndUpdate', function(next) {
+  this.set({ updatedAt: new Date() });
+  next();
+});
+
+// Export model
+export const Entry = mongoose.model('Entry', vaultEntrySchema);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TypeScript Types (opcjonalnie dla TypeScript)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface IEntry extends mongoose.Document {
+  userId: mongoose.Types.ObjectId;
   rawText: string;
-  summary: string | null;
-  tags: string[];
-  strength: number;
-  category: string | null;
-  isAnalyzed: boolean;
-  isConsolidated: boolean;
-  lastActivityAt: Date;
+  analysis: {
+    summary: string;
+    tags: string[];
+    strength: number;
+    category: string;
+    isProcessed: boolean;
+  };
+  actionTools?: {
+    search?: {
+      completed: boolean;
+      facts?: string[];
+      searchResults?: string;
+      sources?: string[];
+      timestamp?: Date;
+      error?: string;
+    };
+    email?: {
+      completed: boolean;
+      sent?: boolean;
+      messageId?: string;
+      recipient?: string;
+      timestamp?: Date;
+      error?: string;
+    };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
-
-const vaultEntrySchema = new Schema<IVaultEntry>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    rawText: {
-      type: String,
-      required: true,
-    },
-    summary: {
-      type: String,
-      default: null,
-    },
-    tags: {
-      type: [String],
-      default: [],
-    },
-    strength: {
-      type: Number,
-      min: 0,
-      max: 10,
-      default: 5, // Start at middle strength
-    },
-    category: {
-      type: String,
-      default: null,
-    },
-    isAnalyzed: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    isConsolidated: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    lastActivityAt: {
-      type: Date,
-      default: Date.now,
-      index: true,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// Compound indexes for efficient queries
-vaultEntrySchema.index({ userId: 1, isAnalyzed: 1 });
-vaultEntrySchema.index({ userId: 1, strength: 1 });
-vaultEntrySchema.index({ userId: 1, lastActivityAt: -1 });
-vaultEntrySchema.index({ isConsolidated: 1, strength: 1 });
-
-export const VaultEntry = mongoose.model<IVaultEntry>('VaultEntry', vaultEntrySchema);
