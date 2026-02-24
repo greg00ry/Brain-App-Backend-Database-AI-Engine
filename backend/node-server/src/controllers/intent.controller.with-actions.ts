@@ -2,7 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/typeHelper.js";
 import { classifyIntent } from "../services/ai/intent.service.js";
-import { aiQueue } from "../services/queue.service.js";
+import { aiQueue } from "../services/ai/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
 
 /**

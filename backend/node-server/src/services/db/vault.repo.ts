@@ -14,7 +14,7 @@ export const VaultRepo = {
         keywords: cat.keywords,
       }));
     },
-    async findVaultEntryForDeltaEntries(userId: string, twentyFourHoursAgo: Date) {
+    async findVaultEntryForDeltaEntries(userId: mongoose.Types.ObjectId, twentyFourHoursAgo: Date) {
         const entries = await VaultEntry.find({
     userId,
     $or: [
@@ -27,7 +27,7 @@ export const VaultRepo = {
     
     return entries
     },
-    async findContextEntries(userId: string, excludeIds: string[]) {
+    async findContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]) {
         const contextEntries = await VaultEntry.find({
             userId,
             _id: { $nin: excludeIds.map(id => new mongoose.Types.ObjectId(id)) },
@@ -63,7 +63,7 @@ export const VaultRepo = {
     async bulkWriteVaultEntriesForConscious(updateOps: any) {
         return await VaultEntry.bulkWrite(updateOps);
     },
-    async findStrongEntries(userId: string) {
+    async findStrongEntries(userId: mongoose.Types.ObjectId) {
         const strongEntries = await VaultEntry.find({
             userId,
             strength: { $gte: 10 },
@@ -75,7 +75,7 @@ export const VaultRepo = {
         const categoryDoc = await Category.findOne({ name: category, isActive: true });
         return categoryDoc
     },
-    async findExistingMemory(userId: string, topic: any) {
+    async findExistingMemory(userId: mongoose.Types.ObjectId, topic: any) {
         const existingMemory = await LongTermMemory.findOne({
                       userId,
                       topic,
@@ -86,7 +86,7 @@ export const VaultRepo = {
         return await existingMemory.save();
     },
     async createNewLongTermMemory(
-        userId: string, 
+        userId: mongoose.Types.ObjectId, 
         memoryData: LongTermMemoryData, 
         categoryDoc: any, 
         category: string, 

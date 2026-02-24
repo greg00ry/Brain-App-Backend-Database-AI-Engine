@@ -83,16 +83,16 @@ vaultEntrySchema.pre('findOneAndUpdate', function(next) {
 });
 
 // Export model
-export const Entry = mongoose.model('Entry', vaultEntrySchema);
+export const VaultEntry = mongoose.model('VaultEntry', vaultEntrySchema);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TypeScript Types (opcjonalnie dla TypeScript)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export interface IEntry extends mongoose.Document {
+export interface IVaultEntry extends mongoose.Document {
   userId: mongoose.Types.ObjectId;
   rawText: string;
-  analysis: {
+  analysis?: {
     summary: string;
     tags: string[];
     strength: number;

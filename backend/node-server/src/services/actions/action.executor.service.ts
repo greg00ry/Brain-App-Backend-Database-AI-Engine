@@ -1,6 +1,6 @@
 import { searchWithTavily, formatTavilyResults, extractKeyFacts } from "./tavily.service.js";
 import { sendEmail, createEmailTemplate } from "./email.service.js";
-import { IntentAction } from "./intent.types.js";
+import { IntentAction } from "../ai/intent.types.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

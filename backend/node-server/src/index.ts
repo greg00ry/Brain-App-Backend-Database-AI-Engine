@@ -9,6 +9,7 @@ import entriesRouter from "./routes/entries.js"
 import analyzeRouter from "./routes/analyze.js"
 import authRouter from "./routes/auth.js"
 import intentRouter from "./routes/intent.route.js"
+import actionRouter from "./routes/actions.route.js"
 
 
 //Jobs
@@ -29,6 +30,7 @@ app.use("/api/entries", entriesRouter)
 app.use("/api/analyze", analyzeRouter)
 app.use("/api/auth", authRouter)
 app.use("/api/intent", intentRouter)
+app.use("api/actions", actionRouter)
 
 //Health check
 app.get("/api/health", (_req, res) => {

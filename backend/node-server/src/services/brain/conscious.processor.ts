@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { mongo } from "mongoose";
 import { IVaultEntry, VaultEntry } from "../../models/VaultEntry.js";
 import { Category } from "../../models/Category.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
@@ -48,37 +48,34 @@ export interface ConsciousStats {
  * Get only the "delta" - entries that need AI attention.
  * This minimizes the context window sent to LM Studio.
  */
-async function getDeltaEntries(userId: string): Promise<IVaultEntry[]> {
+async function getDeltaEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]> {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   
   // Only get entries that:
   // 1. Have NOT been analyzed yet, OR
   // 2. Had activity in the last 24 hours
-  const deltaEntries = await VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo)
-  
+  const deltaEntries = await VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo);
 
-  return deltaEntries;
+  
+  
+  return deltaEntries as unknown as IVaultEntry[];
 }
 
 /**
  * Get existing entries for context (not in delta, but recently relevant).
  * Used to find connections between new and existing entries.
  */
-async function getContextEntries(userId: string, excludeIds: string[]): Promise<IVaultEntry[]> {
+async function getContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]): Promise<IVaultEntry[]> {
   // Get top 20 strongest entries not in delta for context
-  const contextEntries = await VaultRepo.findContextEntries(userId, excludeIds)
+  const contextEntries = await VaultRepo.findContextEntries(userId, excludeIds);
   
-
-  return contextEntries;
+  return contextEntries as unknown as IVaultEntry[];
 }
 
 /**
  * Analyze delta entries AND find connections to existing entries.
  * Returns both topic analysis and synapse recommendations.
  */
-
-
-
 async function analyzeWithSynapses(
   deltaEntries: IVaultEntry[],
   contextEntries: IVaultEntry[],
@@ -87,19 +84,21 @@ async function analyzeWithSynapses(
   if (deltaEntries.length === 0) return { topics: [], synapses: [] };
 
   // Prepare delta entries (new/recently active)
+  // ✅ DOPASOWANE: używamy analysis.summary i analysis.tags
   const deltaSummaries = deltaEntries.map(e => ({
     id: e._id.toString(),
-    text: e.summary || e.rawText.substring(0, 150),
-    tags: e.tags.slice(0, 5),
+    text: e.analysis?.summary || e.rawText.substring(0, 150),
+    tags: e.analysis?.tags?.slice(0, 5) || [],
     isNew: true,
   }));
 
   // Prepare context entries (existing, for connection finding)
+  // ✅ DOPASOWANE: używamy analysis.summary, analysis.tags, analysis.category
   const contextSummaries = contextEntries.map(e => ({
     id: e._id.toString(),
-    text: e.summary || e.rawText.substring(0, 100),
-    tags: e.tags.slice(0, 3),
-    category: e.category,
+    text: e.analysis?.summary || e.rawText.substring(0, 100),
+    tags: e.analysis?.tags?.slice(0, 3) || [],
+    category: e.analysis?.category,
     isNew: false,
   }));
 
@@ -112,8 +111,7 @@ async function analyzeWithSynapses(
     categoryList, 
     JSON.stringify(deltaSummaries, null, 1),
     JSON.stringify(contextSummaries, null, 1)
-  )
-  
+  );
 
   try {
     console.log('👁️ [Świadomość]    Wysyłam do AI:', deltaEntries.length, 'nowych +', contextEntries.length, 'kontekstowych');
@@ -123,9 +121,7 @@ async function analyzeWithSynapses(
         content: "You analyze entries and find semantic connections. Return ONLY valid JSON with topics and synapses arrays. Be selective with connections - only meaningful ones.",
         temperature: 0.1,
         max_tokens: 3000
-    })
-
-    
+    });
 
     if (!response.ok) {
       console.error('👁️ [Świadomość] ⚠️ LM Studio niedostępne');
@@ -135,10 +131,7 @@ async function analyzeWithSynapses(
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
     
-    
-    
-    
-    const parsed = cleanAndParseJSON(content)
+    const parsed = cleanAndParseJSON(content);
     
     return parsed || { topics: [], synapses: [] };
     
@@ -157,25 +150,21 @@ async function createLongTermMemorySummary(
   categoryName: string
 ): Promise<LongTermMemoryData | null> {
   // Take only essential data
+  // ✅ DOPASOWANE: używamy analysis.summary i analysis.tags
   const entriesContent = entries.slice(0, 10).map(e => ({
-    summary: e.summary?.substring(0, 200) || e.rawText.substring(0, 200),
-    tags: e.tags.slice(0, 3),
+    summary: e.analysis?.summary?.substring(0, 200) || e.rawText.substring(0, 200),
+    tags: e.analysis?.tags?.slice(0, 3) || [],
   }));
 
-  const prompt = LONG_TERM_MEMORY_SUMMARY_PROMPT(topic, categoryName, JSON.stringify(entriesContent))
-
-  
+  const prompt = LONG_TERM_MEMORY_SUMMARY_PROMPT(topic, categoryName, JSON.stringify(entriesContent));
 
   try {
-
     const response = await callLMStudio({
       prompt: prompt,
       content: 'Consolidate memories into concise summary. JSON only.',
       temperature: 0.3,
       max_tokens: 800
-    })
-
-    
+    });
 
     if (!response.ok) return null;
 
@@ -184,8 +173,8 @@ async function createLongTermMemorySummary(
     
     const jsonMatch = cleanAndParseJSON(content);
     if (!jsonMatch) {
-      throw new Error("create Long-Term Memory Error:")
-      return null
+      console.error("👁️ [Świadomość] ❌ Błąd parsowania LTM");
+      return null;
     }
     return jsonMatch;
   } catch (error) {
@@ -216,82 +205,81 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
     }
 
     // Get unique users
-    const userIds = await VaultRepo.getUniqueUser()
+    const userIds = await VaultRepo.getUniqueUser();
     console.log(`👁️ [Świadomość] Przetwarzam ${userIds.length} użytkowników`);
 
     for (const userId of userIds) {
-      console.log(`\n👁️ [Świadomość] 👤 Użytkownik: ${userId.substring(0, 8)}...`);
+      console.log(`\n👁️ [Świadomość] 👤 Użytkownik: ${userId.toString().substring(0, 8)}...`);
 
       // ========================================
       // STEP 1: ANALYZE DELTA + FIND SYNAPSES
       // ========================================
-      // ========================================
-// STEP 1: ANALYZE DELTA + FIND SYNAPSES
-// ========================================
-const deltaEntries = await getDeltaEntries(userId);
+      const deltaEntries = await getDeltaEntries(userId);
 
-if (deltaEntries.length === 0) {
-  console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
-} else {
-  console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
+      if (deltaEntries.length === 0) {
+        console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
+      } else {
+        console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
 
-  // --- START BATCHING ---
-  const BATCH_SIZE = 5; // Bezpieczna ilość, żeby DeepSeek nie wypluł za długiego JSONa
-  for (let i = 0; i < deltaEntries.length; i += BATCH_SIZE) {
-    const currentBatch = deltaEntries.slice(i, i + BATCH_SIZE);
-    console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
+        // --- START BATCHING ---
+        const BATCH_SIZE = 5; // Bezpieczna ilość, żeby DeepSeek nie wypluł za długiego JSONa
+        for (let i = 0; i < deltaEntries.length; i += BATCH_SIZE) {
+          const currentBatch = deltaEntries.slice(i, i + BATCH_SIZE);
+          console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
 
-    // Get context entries for synapse discovery
-    const deltaIds = currentBatch.map(e => e._id.toString());
-    const contextEntries = await getContextEntries(userId, deltaIds);
-    
-    // ANALIZA POJEDYNCZEJ PACZKI
-    const analysisResult = await analyzeWithSynapses(currentBatch, contextEntries, categories);
-    const { topics, synapses } = analysisResult;
-    
-    console.log(`👁️ [Batch] Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
+          // Get context entries for synapse discovery
+          const deltaIds = currentBatch.map(e => e._id.toString());
+          const contextEntries = await getContextEntries(userId, deltaIds);
+          
+          // ANALIZA POJEDYNCZEJ PACZKI
+          const analysisResult = await analyzeWithSynapses(currentBatch, contextEntries, categories);
+          const { topics, synapses } = analysisResult;
+          
+          console.log(`👁️ [Batch] Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
 
-    // Aktualizacja wpisów wynikami z paczki
-    for (const topic of topics) {
-      const updateOps = VaultRepo.mapEntryIds(topic);
-      if (updateOps.length > 0) {
-        await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps);
-        stats.analyzed += updateOps.length;
+          // Aktualizacja wpisów wynikami z paczki
+          for (const topic of topics) {
+            const updateOps = VaultRepo.mapEntryIds(topic);
+            if (updateOps.length > 0) {
+              await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps);
+              stats.analyzed += updateOps.length;
+            }
+          }
+
+          // Procesowanie synaps z paczki
+          if (synapses.length > 0) {
+            const deltaIdSet = new Set(deltaIds);
+            const synapsesCreated = await processSynapseLinks(synapses, deltaIdSet);
+            stats.synapsesCreated += synapsesCreated;
+          }
+        }
+        // --- END BATCHING ---
       }
-    }
-
-    // Procesowanie synaps z paczki
-    if (synapses.length > 0) {
-      const deltaIdSet = new Set(deltaIds);
-      const synapsesCreated = await processSynapseLinks(synapses, deltaIdSet);
-      stats.synapsesCreated += synapsesCreated;
-    }
-  }
-  // --- END BATCHING ---
-}
 
       // ========================================
       // STEP 2: CONSOLIDATE STRONG MEMORIES INTO LTM
       // Only process entries marked by subconscious (strength >= 10)
       // ========================================
-      const strongEntries = await VaultRepo.findStrongEntries(userId)
+      const strongEntries = await VaultRepo.findStrongEntries(userId);
 
       if (strongEntries.length > 0) {
         console.log(`👁️ [Świadomość]    Konsolidacja: ${strongEntries.length} silnych wspomnień`);
 
         // Group by category for consolidation
+        // ✅ DOPASOWANE: używamy analysis.category
         const entriesByCategory = new Map<string, IVaultEntry[]>();
         for (const entry of strongEntries) {
-          const cat = entry.category || 'Uncategorized';
+          const cat = entry.analysis?.category || 'Uncategorized';
           if (!entriesByCategory.has(cat)) {
             entriesByCategory.set(cat, []);
           }
-          entriesByCategory.get(cat)!.push(entry);
+          entriesByCategory.get(cat)!.push(entry as unknown as IVaultEntry);
         }
 
         for (const [category, entries] of entriesByCategory) {
           // Create topic name from common tags
-          const allTags = entries.flatMap(e => e.tags);
+          // ✅ DOPASOWANE: używamy analysis.tags
+          const allTags = entries.flatMap(e => e.analysis?.tags || []);
           const tagCounts = new Map<string, number>();
           allTags.forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1));
           const topTags = [...tagCounts.entries()]
@@ -306,16 +294,16 @@ if (deltaEntries.length === 0) {
           const memoryData = await createLongTermMemorySummary(entries, topic, category);
 
           if (memoryData) {
-            const categoryDoc = await VaultRepo.findCategoryDoc(category)
+            const categoryDoc = await VaultRepo.findCategoryDoc(category);
 
             // Check for existing memory
-            const existingMemory = await VaultRepo.findExistingMemory(userId, topic)
+            const existingMemory = await VaultRepo.findExistingMemory(userId, topic);
 
             if (existingMemory) {
               existingMemory.summary = memoryData.summary;
               existingMemory.tags = [...new Set([...existingMemory.tags, ...memoryData.tags])];
               existingMemory.sourceEntryIds = entries.map(e => e._id);
-              await VaultRepo.saveExistingMemory(existingMemory)
+              await VaultRepo.saveExistingMemory(existingMemory);
               console.log(`👁️ [Świadomość]    ✅ Zaktualizowano istniejące LTM`);
             } else {
               await VaultRepo.createNewLongTermMemory(
@@ -325,12 +313,12 @@ if (deltaEntries.length === 0) {
                 category,
                 entries,
                 topic
-              )
+              );
               console.log(`👁️ [Świadomość]    ✅ Utworzono nowe LTM`);
             }
 
             // Mark entries as consolidated
-            await VaultRepo.updateManyVaultEntries(entries)
+            await VaultRepo.updateManyVaultEntries(entries);
 
             stats.consolidated += entries.length;
           }
