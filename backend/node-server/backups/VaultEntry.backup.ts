@@ -23,7 +23,7 @@ const vaultEntrySchema = new mongoose.Schema({
   analysis: {
     summary: { type: String},
     tags: [{ type: String }],
-    strength: { type: Number, min: 0, max: 10, default: 5 },
+    strength: { type: Number, min: 0, max: 10 },
     category: { type: String },
     isProcessed: { type: Boolean, default: false }
   },
@@ -50,44 +50,8 @@ const vaultEntrySchema = new mongoose.Schema({
       recipient: { type: String },
       timestamp: { type: Date },
       error: { type: String }
-    },
-    calendar: {
-        status: { 
-          type: String, 
-          enum: ['pending', 'processing', 'completed', 'failed'],
-          default: 'pending' 
-        },
-        completed: { type: Boolean, default: false },
-        eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'CalendarEvent' },
-        eventTitle: { type: String },
-        eventDate: { type: Date },
-        timestamp: { type: Date },
-        error: { type: String },
-      },
-       uiHint: {
-        type: String,
-        enum: ['pulse', 'calendar_entry', 'mail_sent', 'search_complete', 'thinking', 'error', 'success'],
-        default: 'pulse',
-      },
+    }
   },
-
-  isAnalyzed: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    
-    isConsolidated: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    
-    lastActivityAt: {
-      type: Date,
-      default: Date.now,
-      index: true,
-    },
 
   // ─── Timestamps ────────────────────────────────────────────────────────────
   
@@ -125,15 +89,6 @@ export const VaultEntry = mongoose.model('VaultEntry', vaultEntrySchema);
 // TypeScript Types (opcjonalnie dla TypeScript)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type UIHintType = 
-  | 'pulse'           // Domyślna animacja
-  | 'calendar_entry'  // Gdy utworzono event
-  | 'mail_sent'       // Gdy wysłano mail
-  | 'search_complete' // Gdy research zakończony
-  | 'thinking'        // AI myśli
-  | 'error'           // Błąd
-  | 'success';        // Sukces
-
 export interface IVaultEntry extends mongoose.Document {
   userId: mongoose.Types.ObjectId;
   rawText: string;
@@ -161,20 +116,7 @@ export interface IVaultEntry extends mongoose.Document {
       timestamp?: Date;
       error?: string;
     };
-    calendar?: {
-          status: 'pending' | 'processing' | 'completed' | 'failed';
-          completed: boolean;
-          eventId?: mongoose.Types.ObjectId;
-          eventTitle?: string;
-          eventDate?: Date;
-          timestamp?: Date;
-          error?: string;
-        };
-        uiHint?: UIHintType;
   };
-  isAnalyzed: boolean;
-  isConsolidated: boolean;
-  lastActivityAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }

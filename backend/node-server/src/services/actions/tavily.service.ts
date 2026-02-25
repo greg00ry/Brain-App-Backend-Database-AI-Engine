@@ -39,6 +39,9 @@ export async function searchWithTavily(
   params: TavilySearchParams
 ): Promise<TavilyResponse> {
   
+  const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
+  const TAVILY_API_URL = "https://api.tavily.com/search";
+
   if (!TAVILY_API_KEY) {
     throw new Error("TAVILY_API_KEY not configured in environment");
   }
