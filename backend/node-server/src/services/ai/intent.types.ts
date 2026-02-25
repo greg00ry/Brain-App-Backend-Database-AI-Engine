@@ -11,6 +11,7 @@ export type IntentAction =
 export interface IntentResult {
   action: IntentAction;
   reasoning: string;
+  answer: string;
   
   // ─── Event Data (tylko dla CREATE_EVENT) ────────────────────────────────────
   eventData?: {
