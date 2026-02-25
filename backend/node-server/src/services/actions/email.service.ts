@@ -40,6 +40,11 @@ let transporter: Transporter | null = null;
  * Inicjalizuje transporter Nodemailer (lazy initialization)
  */
 function getTransporter(): Transporter {
+  const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+  const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+  const SMTP_USER = process.env.SMTP_USER;
+  const SMTP_PASS = process.env.SMTP_PASS;
+  const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
   if (!transporter) {
     if (!SMTP_USER || !SMTP_PASS) {
       throw new Error("SMTP_USER and SMTP_PASS must be configured in environment");
@@ -123,7 +128,7 @@ export async function sendEmail(
   params: EmailParams,
   contextText?: string
 ): Promise<EmailResult> {
-  
+  const DEFAULT_RECIPIENT = process.env.ADMIN_EMAIL || process.env.DEFAULT_EMAIL_RECIPIENT;
   // 1. Określ odbiorcę
   let recipient = params.to;
 

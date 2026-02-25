@@ -1,5 +1,6 @@
 import axios from "axios";
 import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
+import { cleanAndParseJSON } from "./ai.service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT CLASSIFICATION SERVICE - Extended with Calendar & Dynamic Email
@@ -145,12 +146,14 @@ const VALID_ACTIONS = new Set<IntentAction>([
 ]);
 
 function parseIntentJSON(raw: string): IntentResult | null {
-  const cleaned = raw.replace(/```(?:json)?/gi, "").trim();
-  const match = cleaned.match(/\{[\s\S]*?\}/);
-  if (!match) return null;
+  
+  const parsed = cleanAndParseJSON(raw)
+
+
+  if (!parsed) return null;
 
   try {
-    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    
     const action = parsed["action"];
     const reasoning = typeof parsed["reasoning"] === "string" 
       ? parsed["reasoning"] 

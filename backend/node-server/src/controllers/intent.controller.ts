@@ -107,6 +107,7 @@ export const intentController = asyncHandler(
           entryId,
           text: text.trim(),
           action: intentResult.action,
+          intentResult
         });
 
         sendSSE({

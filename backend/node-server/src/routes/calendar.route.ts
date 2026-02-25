@@ -13,7 +13,7 @@ import {
   rescheduleEvent,
   deleteEvent,
   getCalendarStats,
-} from "../services/calendar/calendar.service.js";
+} from "../services/actions/calendar.service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CALENDAR ROUTER - Full CRUD + Stats

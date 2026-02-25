@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Types } from 'mongoose';
+import mongoose, { Document, Schema, Types, Model } from 'mongoose';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CALENDAR EVENT MODEL - Personal Assistant Calendar (Offline-first)
@@ -15,14 +15,23 @@ export interface ICalendarEvent extends Document {
   endDate: Date | null;
   category: EventCategory;
   isDone: boolean;
-  // Metadata
-  createdByAction: boolean; // True jeśli utworzony przez AI action
-  sourceEntryId: Types.ObjectId | null; // Link do VaultEntry który stworzył event
+  createdByAction: boolean;
+  sourceEntryId: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
+  // Deklaracja metod instancji
+  markAsDone(): Promise<ICalendarEvent>;
+  reschedule(newStartDate: Date, newEndDate?: Date): Promise<ICalendarEvent>;
 }
 
-const calendarEventSchema = new Schema<ICalendarEvent>(
+export interface ICalendarEventModel extends Model<ICalendarEvent> {
+  getUpcoming(userId: string | Types.ObjectId, limit?: number): Promise<ICalendarEvent[]>;
+  getToday(userId: string | Types.ObjectId): Promise<ICalendarEvent[]>;
+  getOverdue(userId: string | Types.ObjectId): Promise<ICalendarEvent[]>;
+  getInRange(userId: string | Types.ObjectId, start: Date, end: Date): Promise<ICalendarEvent[]>;
+}
+
+const calendarEventSchema = new Schema<ICalendarEvent, ICalendarEventModel>(
   {
     userId: {
       type: Schema.Types.ObjectId,
@@ -76,6 +85,8 @@ const calendarEventSchema = new Schema<ICalendarEvent>(
     timestamps: true,
   }
 );
+
+
 
 // ─── Indexes dla wydajności ──────────────────────────────────────────────────
 
@@ -176,4 +187,4 @@ calendarEventSchema.statics.getOverdue = function (userId: string | Types.Object
 
 // ─── Export ──────────────────────────────────────────────────────────────────
 
-export const CalendarEvent = mongoose.model<ICalendarEvent>('CalendarEvent', calendarEventSchema);
+export const CalendarEvent = mongoose.model<ICalendarEvent, ICalendarEventModel>('CalendarEvent', calendarEventSchema);

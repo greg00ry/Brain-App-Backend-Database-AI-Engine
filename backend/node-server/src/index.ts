@@ -12,6 +12,7 @@ import analyzeRouter from "./routes/analyze.js"
 import authRouter from "./routes/auth.js"
 import intentRouter from "./routes/intent.route.js"
 import actionRouter from "./routes/actions.route.js"
+import calendarRouter from "./routes/calendar.route.js"
 
 
 //Jobs
@@ -35,6 +36,7 @@ app.use("/api/analyze", analyzeRouter)
 app.use("/api/auth", authRouter)
 app.use("/api/intent", intentRouter)
 app.use("/api/actions", actionRouter)
+app.use("/api/calendar", calendarRouter)
 
 //Health check
 app.get("/api/health", (_req, res) => {
@@ -58,6 +60,12 @@ async function start() {
 🧠 Analiza: /api/analyze
 ⚙️ Health:  /api/health
 🌙 Cron:    03:00 rano
+  ║   • POST   /api/intent/stream      - AI Processing               ║
+  ║   • GET    /api/actions/status/:id - Action Tools Status         ║
+  ║   • POST   /api/calendar           - Create Event                ║
+  ║   • GET    /api/calendar/upcoming  - Get Upcoming Events         ║
+  ║   • GET    /api/calendar/today     - Get Today Events            ║
+  ║   • GET    /api/calendar/stats     - Calendar Stats 
 ----------------------------------
         `)
     })
