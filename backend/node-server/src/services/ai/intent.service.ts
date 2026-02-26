@@ -1,10 +1,10 @@
 import axios from "axios";
 import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
 import { cleanAndParseJSON } from "./ai.service.js";
-import { getConversationContext } from "./intent.context.service.js";
+import { getBrainContext } from "./intent.context.service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INTENT CLASSIFICATION SERVICE - Jarvis Edition with Memory Access
+// INTENT SERVICE - Stabilized with Few-Shot & Recursive Context (3x3)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -24,136 +24,154 @@ export interface ClassifyIntentParams {
 
 const LLM_API_URL = process.env.LLM_API_URL ?? "http://localhost:1234/v1/chat/completions";
 const LLM_MODEL = process.env.LLM_MODEL ?? "local-model";
-const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT ?? 25_000); // Zwiększony timeout
+const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT ?? 30_000);
 
-// ─── System Prompt (Jarvis Personality) ─────────────────────────────────────
+// ─── System Prompt with Few-Shot Examples ────────────────────────────────────
 
 function buildJarvisSystemPrompt(
-  memoryContext: string,
+  brainContext: string,
   chatHistory?: ChatMessage[]
 ): string {
-  // Historia rozmowy (ostatnie 5 wiadomości)
+  // Historia rozmowy (ostatnie 5)
   let historySection = '';
   if (chatHistory && chatHistory.length > 0) {
-    historySection = '\n\n═══ HISTORIA ROZMOWY ═══\n';
-    const recentHistory = chatHistory.slice(-5); // Ostatnie 5 wiadomości
+    historySection = '\n<CHAT_HISTORY>\n';
+    const recentHistory = chatHistory.slice(-5);
     recentHistory.forEach(msg => {
-      const role = msg.role === 'user' ? 'Sir' : 'Jarvis';
+      const role = msg.role === 'user' ? 'User' : 'Jarvis';
       historySection += `${role}: ${msg.content}\n`;
     });
-    historySection += '═══════════════════════════\n';
+    historySection += '</CHAT_HISTORY>\n';
   }
 
-  return `You are JARVIS - an advanced AI assistant serving your user (referred to as "sir").
+  return `You are JARVIS - AI assistant. Style: konkretny, pragmatyczny, pomocny. Zwrot: "mordo".
 
-PERSONALITY & STYLE:
-- Konkretny, pragmatyczny, pomocny
-- Używaj zwrotów: "sir", "dobrze, sir", "zrobione, sir", "oczywiście, sir"
-- Mów w pierwszej osobie: "Sprawdzam, sir", "Wykonuję zadanie, sir"
-- Język: POLSKI (z wyjątkiem zwrotów jak "sir")
-- Ton: profesjonalny, ale ciepły - jak Alfred dla Bruce'a Wayne'a
-
-CURRENT DATE & TIME: ${new Date().toISOString()}
+CURRENT DATE: ${new Date().toISOString()}
 
 ${historySection}
 
-═══ DOSTĘPNA PAMIĘĆ I WIEDZA ═══
-${memoryContext}
+<BRAIN_CONTEXT>
+${brainContext}
+</BRAIN_CONTEXT>
 
-CRITICAL: Respond with ONLY valid JSON - no markdown, no backticks, no extra text.
+CRITICAL: Respond ONLY with valid JSON - NO markdown, NO backticks, NO extra text.
 
-Required JSON format:
+JSON Format:
 {
   "action": "SAVE_ONLY" | "SAVE_SEARCH" | "SAVE_MAIL" | "CREATE_EVENT",
-  "reasoning": "short technical explanation in Polish",
-  "answer": "natural conversational response to user in JARVIS style",
-  "eventData": { ... }  // ONLY if action is CREATE_EVENT
-  "emailData": { ... }  // ONLY if action is SAVE_MAIL
+  "reasoning": "short technical explanation",
+  "answer": "natural Polish response with 'mordo' style",
+  "eventData": {...}  // ONLY if CREATE_EVENT
+  "emailData": {...}  // ONLY if SAVE_MAIL
 }
 
-RULES FOR CLASSIFICATION:
-1. CREATE_EVENT → user mentions DATE/TIME or asks for REMINDER/APPOINTMENT
-   - Extract: title, description, startDate (ISO 8601), endDate (optional), category
-   - Categories: work, health, personal, meeting, reminder, other
-   - Answer example: "Oczywiście, sir. Ustawiam przypomnienie na jutro o 10:00. Powiadomię pana odpowiednio wcześniej."
+CLASSIFICATION RULES:
+1. CREATE_EVENT → date/time or reminder mentioned
+   Extract: title, startDate (ISO 8601), category
+   
+2. SAVE_MAIL → email sending request
+   Extract recipient if found
 
-2. SAVE_MAIL → user wants to send EMAIL/MESSAGE
-   - Try to extract recipient email from text
-   - Answer example: "Dobrze, sir. Wysyłam wiadomość do john@example.com. Potwierdzę gdy będzie wysłana."
+3. SAVE_SEARCH → web search or current info request
 
-3. SAVE_SEARCH → user wants WEB SEARCH or CURRENT INFO
-   - Answer example: "Sprawdzam w internecie, sir. Zajmie mi to chwilę."
+4. SAVE_ONLY → general conversation, questions, notes
 
-4. SAVE_ONLY → general conversation, notes, thoughts
-   - Use this for questions, greetings, casual talk
-   - Answer should be HELPFUL and CONVERSATIONAL
-   - Use memory context to provide informed responses
-   - Answer example: "Rozumiem, sir. Zapamiętałem to."
+FEW-SHOT EXAMPLES (Learn the pattern!):
 
-JARVIS ANSWER GUIDELINES:
-- Always acknowledge the request with "sir"
-- Reference memory when relevant: "Pamiętam, że sir wspominał o..."
-- Be proactive: suggest related actions or information
-- If memory is empty, still be helpful but don't pretend to remember
-- Keep answers concise but warm (2-4 sentences max)
-- Use memory synapses to make connections: "To powiązane z pana wcześniejszym projektem o..."
-
-EXAMPLES OF GOOD JARVIS ANSWERS:
-
+Example 1:
 User: "Jak się masz?"
-Answer: "Wszystkie systemy działają poprawnie, sir. Gotowy do pomocy."
+{
+  "action": "SAVE_ONLY",
+  "reasoning": "Greeting, no action needed",
+  "answer": "Wszystko git, mordo. Gotowy do roboty."
+}
 
-User: "Co robiłem wczoraj?"
-Answer: "Według moich danych, sir wczoraj pracował nad projektem AI. Czy chce pan więcej szczegółów?"
+Example 2:
+User: "Przypomnij mi jutro o 10 o spotkaniu"
+{
+  "action": "CREATE_EVENT",
+  "reasoning": "Reminder request with specific time",
+  "answer": "Jasne, mordo. Ustawiam przypomnienie na jutro o 10:00. Dasz znać jak trzeba.",
+  "eventData": {
+    "title": "Spotkanie",
+    "startDate": "2024-12-26T10:00:00Z",
+    "category": "reminder"
+  }
+}
 
-User: "Przypomnij mi jutro o spotkaniu"
-Answer: "Oczywiście, sir. Ustawiam przypomnienie na jutro o godzinie, którą sir preferuje. Powiadomię pana z wyprzedzeniem."
+Example 3:
+User: "Wyślij mail do john@example.com o projekcie"
+{
+  "action": "SAVE_MAIL",
+  "reasoning": "Email request with recipient",
+  "answer": "Okej, mordo. Wysyłam do john@example.com. Potwierdzę jak pójdzie.",
+  "emailData": {
+    "recipient": "john@example.com",
+    "subject": "o projekcie"
+  }
+}
 
-User: "Znajdź info o nowych technologiach AI"
-Answer: "Zaraz sprawdzam najnowsze informacje, sir. Przeanalizuję aktualne źródła i przedstawię podsumowanie."
+Example 4:
+User: "Znajdź info o AI w 2024"
+{
+  "action": "SAVE_SEARCH",
+  "reasoning": "Web search request for current info",
+  "answer": "Sprawdzam w necie, mordo. Chwila."
+}
 
-DATE PARSING EXAMPLES (for CREATE_EVENT):
-- "jutro o 10" → tomorrow at 10:00
-- "w piątek" → next Friday at 09:00
-- "za tydzień" → 7 days from now
-- "15 grudnia" → December 15th this year
-- "za 2 godziny" → 2 hours from now
+Example 5 (using brain context):
+User: "Co tam z tym projektem?"
+Brain: "Projekt AI na UW" connected to "Deep Learning kurs"
+{
+  "action": "SAVE_ONLY",
+  "reasoning": "Question about existing project in memory",
+  "answer": "No pamiętam, mordo - pracowałeś nad projektem AI na UW. To było powiązane z kursem Deep Learning. Potrzebujesz szczegółów?"
+}
+
+JARVIS STYLE:
+- Use brain context when relevant
+- Be concise (2-3 sentences)
+- "mordo" instead of "sir"
+- Polish language
+- Pragmatic, no bullshit
+
+DATE PARSING:
+- "jutro o 10" → tomorrow 10:00
+- "w piątek" → next Friday 09:00
+- "za tydzień" → +7 days
+- "15 grudnia" → Dec 15 this year
 
 REMEMBER: 
-- JSON only, no extra text
-- "answer" field is WHERE JARVIS TALKS to the user
-- Use memory context to personalize responses
-- Be helpful even when memory is empty`;
+- ONLY valid JSON output
+- NO markdown, NO backticks
+- "answer" field = where Jarvis talks to user
+- Use brain synapses to make connections`;
 }
 
 // ─── Keyword Fallback ────────────────────────────────────────────────────────
 
 const SEARCH_KEYWORDS = [
-  /wyszukaj/i, /znajdź w sieci/i, /sprawdź online/i, /pobierz dane/i,
-  /aktualne informacje/i, /szukaj/i,
-  /search/i, /look up/i, /find online/i, /web search/i, /fetch data/i,
+  /wyszukaj/i, /znajdź w sieci/i, /sprawdź online/i, /szukaj/i,
+  /search/i, /look up/i, /find online/i,
 ];
 
 const MAIL_KEYWORDS = [
-  /wyślij (e-?mail|wiadomość|mail)/i, /prześlij mailem/i, /napisz (do|mail)/i,
-  /send (an? )?(e-?mail|message|mail)/i, /email (this|that|to)/i,
+  /wyślij (e-?mail|wiadomość|mail)/i, /napisz (do|mail)/i,
+  /send (an? )?(e-?mail|message)/i,
 ];
 
 const EVENT_KEYWORDS = [
-  /przypomnij/i, /przypomnienie/i, /spotkanie/i, /wydarzenie/i, /kalendarz/i,
-  /jutro/i, /dziś/i, /dzisiaj/i, /w piątek/i, /w poniedziałek/i,
-  /za (tydzień|godzinę|miesiąc)/i, /o godzinie/i,
-  /remind/i, /reminder/i, /appointment/i, /meeting/i, /schedule/i, /calendar/i,
-  /tomorrow/i, /today/i, /next (week|month|friday)/i, /at \d{1,2}(am|pm|:\d{2})/i,
+  /przypomnij/i, /przypomnienie/i, /spotkanie/i, /kalendarz/i,
+  /jutro/i, /dziś/i, /dzisiaj/i, /w piątek/i,
+  /remind/i, /reminder/i, /meeting/i, /tomorrow/i, /today/i,
 ];
 
 function keywordFallback(text: string): IntentResult {
-  // Event ma najwyższy priorytet
   if (EVENT_KEYWORDS.some((re) => re.test(text))) {
     return { 
       action: "CREATE_EVENT", 
-      reasoning: "Keyword match: date/reminder detected",
-      answer: "Oczywiście, sir. Ustawiam przypomnienie. Powiadomię pana o czasie.",
+      reasoning: "Keyword match: date/reminder",
+      answer: "Jasne, mordo. Ustawiam przypomnienie.",
       eventData: {
         title: text.substring(0, 100),
         startDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -165,23 +183,23 @@ function keywordFallback(text: string): IntentResult {
   if (MAIL_KEYWORDS.some((re) => re.test(text))) {
     return { 
       action: "SAVE_MAIL", 
-      reasoning: "Keyword match: send/mail detected",
-      answer: "Dobrze, sir. Przygotowuję wiadomość do wysłania."
+      reasoning: "Keyword match: send/mail",
+      answer: "Okej, mordo. Przygotowuję maila."
     };
   }
   
   if (SEARCH_KEYWORDS.some((re) => re.test(text))) {
     return { 
       action: "SAVE_SEARCH", 
-      reasoning: "Keyword match: search/web detected",
-      answer: "Sprawdzam w internecie, sir. Zajmie mi to chwilę."
+      reasoning: "Keyword match: search/web",
+      answer: "Sprawdzam w necie, mordo."
     };
   }
   
   return { 
     action: "SAVE_ONLY", 
-    reasoning: "No matching keywords — general conversation",
-    answer: "Rozumiem, sir. Jestem do dyspozycji jeśli będzie pan czegoś potrzebował."
+    reasoning: "General conversation",
+    answer: "Łap, mordo. Jestem jak coś."
   };
 }
 
@@ -195,9 +213,13 @@ const VALID_ACTIONS = new Set<IntentAction>([
 ]);
 
 function parseIntentJSON(raw: string): IntentResult | null {
+  // Używamy cleanAndParseJSON jako bezpiecznik
   const parsed = cleanAndParseJSON(raw);
   
-  if (!parsed) return null;
+  if (!parsed) {
+    console.warn('[IntentService] cleanAndParseJSON returned null');
+    return null;
+  }
 
   try {
     const action = parsed["action"];
@@ -206,13 +228,13 @@ function parseIntentJSON(raw: string): IntentResult | null {
       : "No reasoning provided";
     const answer = typeof parsed["answer"] === "string"
       ? parsed["answer"]
-      : "Dobrze, sir."; // Default Jarvis response
+      : "Okej, mordo."; // Default fallback
 
     if (typeof action === "string" && VALID_ACTIONS.has(action as IntentAction)) {
       const result: IntentResult = { 
         action: action as IntentAction, 
         reasoning,
-        answer // ← NOWE POLE!
+        answer
       };
       
       // Dodaj eventData jeśli CREATE_EVENT
@@ -234,77 +256,79 @@ function parseIntentJSON(raw: string): IntentResult | null {
   return null;
 }
 
-// ─── Main Service Function ───────────────────────────────────────────────────
+// ─── Main Service ────────────────────────────────────────────────────────────
 
 /**
- * Klasyfikuje intencję użytkownika przez LLM z dostępem do pamięci
- * Jarvis Edition - z naturalną konwersacją
+ * Klasyfikuje intencję z dostępem do rekurencyjnego drzewa synaps (3x3)
+ * Stabilizacja: temperature 0.1, Few-Shot examples, cleanAndParseJSON
  */
 export async function classifyIntent(params: ClassifyIntentParams): Promise<IntentResult> {
   const { userText, userId, chatHistory = [] } = params;
   
-  console.log('[IntentService] Classifying intent for user:', userId);
+  console.log('[IntentService] ═══ Classifying intent ═══');
+  console.log('[IntentService] User:', userId);
+  console.log('[IntentService] Text:', userText);
 
   try {
-    // 1. Pobierz kontekst z pamięci
-    const memoryContext = await getConversationContext(userId, userText);
-    console.log('[IntentService] Memory context retrieved:', memoryContext.hasContext);
+    // 1. Pobierz kontekst mózgu (recursive 3x3)
+    console.log('[IntentService] Fetching brain context (3x3 tree)...');
+    const brainContext = await getBrainContext(userId, userText);
+    console.log('[IntentService] Brain context retrieved:', brainContext.hasContext);
 
-    // 2. Zbuduj System Prompt z pamięcią i historią
+    // 2. Zbuduj System Prompt z Few-Shot
     const systemPrompt = buildJarvisSystemPrompt(
-      memoryContext.formattedContext,
+      brainContext.synapticTree,
       chatHistory
     );
 
-    // 3. Przygotuj wiadomości dla LLM
-    const messages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      // Dodaj historię rozmowy (już jest w system prompt jako kontekst)
-      { role: 'user', content: userText },
-    ];
-
-    // 4. Wywołaj LLM
+    // 3. Wywołaj LLM z NISKĄ temperature (stabilizacja!)
+    console.log('[IntentService] Calling LLM with temperature=0.1...');
+    
     const response = await axios.post<LLMResponse>(
       LLM_API_URL,
       {
         model: LLM_MODEL,
-        temperature: 0.3, // Lekko kreatywny dla naturalnej konwersacji
-        max_tokens: 500,  // Więcej dla "answer" field
-        messages,
+        temperature: 0.1, // ← KRYTYCZNE: Niska temp = mniej śmieci!
+        max_tokens: 600,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText },
+        ],
       },
       { timeout: LLM_TIMEOUT }
     );
 
     const rawContent = response.data?.choices?.[0]?.message?.content ?? "";
+    console.log("[IntentService] LLM raw output length:", rawContent.length);
     console.debug("[IntentService] LLM raw output:", rawContent);
 
-    // 5. Parsuj odpowiedź
+    // 4. Parsuj przez cleanAndParseJSON (bezpiecznik!)
     const llmResult = parseIntentJSON(rawContent);
+    
     if (llmResult) {
-      console.log("[IntentService] ✓ LLM result:", {
+      console.log("[IntentService] ✓ Successfully parsed:", {
         action: llmResult.action,
-        hasAnswer: !!llmResult.answer
+        hasAnswer: !!llmResult.answer,
+        answerLength: llmResult.answer?.length
       });
       return llmResult;
     }
 
-    console.warn("[IntentService] Nieparseable JSON od LLM — keyword fallback");
+    console.warn("[IntentService] ⚠️ LLM output not parseable → keyword fallback");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[IntentService] Błąd LLM (${LLM_API_URL}): ${message} — keyword fallback`);
+    console.error(`[IntentService] ❌ Error: ${message}`);
+    console.warn('[IntentService] Falling back to keyword matching');
   }
 
-  // 6. Keyword fallback
+  // 5. Keyword fallback (bezpieczny)
   const kwResult = keywordFallback(userText);
-  console.debug("[IntentService] Keyword fallback:", kwResult);
+  console.log("[IntentService] Keyword fallback result:", kwResult.action);
   return kwResult;
 }
 
 // ─── Helper: Validate Event Data ────────────────────────────────────────────
 
-/**
- * Waliduje i normalizuje dane wydarzenia z LLM
- */
 export function validateEventData(eventData?: IntentResult["eventData"]): {
   isValid: boolean;
   normalized?: IntentResult["eventData"];
@@ -318,20 +342,17 @@ export function validateEventData(eventData?: IntentResult["eventData"]): {
     return { isValid: false, error: "Missing title or startDate" };
   }
 
-  // Sprawdź czy startDate jest valid ISO date
   const startDate = new Date(eventData.startDate);
   if (isNaN(startDate.getTime())) {
     return { isValid: false, error: "Invalid startDate format" };
   }
 
-  // Sprawdź czy endDate jest valid (jeśli podany)
   if (eventData.endDate) {
     const endDate = new Date(eventData.endDate);
     if (isNaN(endDate.getTime())) {
       return { isValid: false, error: "Invalid endDate format" };
     }
     
-    // endDate musi być po startDate
     if (endDate <= startDate) {
       return { isValid: false, error: "endDate must be after startDate" };
     }
