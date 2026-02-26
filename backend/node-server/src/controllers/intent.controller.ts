@@ -5,6 +5,7 @@ import { classifyIntent } from "../services/ai/intent.service.js";
 import { aiQueue } from "../services/ai/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
 
+
 /**
  * POST /intent/stream
  * Flow:
@@ -36,18 +37,19 @@ export const intentController = asyncHandler(
       // KROK 1: Klasyfikacja intencji
       // ═══════════════════════════════════════════════════════════════════════
       
-      sendSSE({
-        stage: "intent_classification",
-        status: "processing",
-        content: "Analizuję intencję...",
+      //const chatHistory = await getChatHistory(userId); // Twoja implementacja
+
+      const intentResult = await classifyIntent({
+        userText: text.trim(),
+        userId: userId.toString(),
+        //chatHistory: chatHistory, // Opcjonalne
       });
 
-      const intentResult = await classifyIntent(text.trim());
-
+      // Wyślij answer do frontendu
       sendSSE({
-        stage: "intent_classification",
+        stage: "jarvis_response",
         status: "complete",
-        content: `Wykryto: ${intentResult.action}`,
+        content: intentResult.answer, // ← Jarvis mówi do użytkownika!
         data: intentResult,
       });
 
