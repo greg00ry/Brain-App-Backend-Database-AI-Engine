@@ -194,7 +194,7 @@ export async function getBrainContext(
     }
 
     return {
-      relevantEntries: entries as IVaultEntry[],
+      relevantEntries: entries as unknown as IVaultEntry[],
       synapticTree: synapticTreeFormatted,
       hasContext: true,
     };

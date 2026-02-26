@@ -2,7 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/typeHelper.js";
 import { classifyIntent } from "../services/ai/intent.service.js";
-import { aiQueue } from "../services/ai/queue.service.js";
+import { aiQueue } from "../services/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
 import { getChatHistory, addChatMessage } from "../services/chat/chat.history.service.js";
 
@@ -14,7 +14,7 @@ import { getChatHistory, addChatMessage } from "../services/chat/chat.history.se
  * POST /intent/stream
  * Przetwarza intencję użytkownika z dostępem do historii rozmowy
  */
-export const intentController = asyncHandler(
+export const intentControllerWithChatHistory = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { text, sessionId } = req.body as { text: string; sessionId?: string };
     const userId = req.user?._id;

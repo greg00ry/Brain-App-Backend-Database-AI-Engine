@@ -4,27 +4,23 @@ import { asyncHandler } from "../utils/typeHelper.js";
 import { classifyIntent } from "../services/ai/intent.service.js";
 import { aiQueue } from "../services/ai/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
-import { getChatHistory, addChatMessage } from "../services/chat/chat.history.service.js";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// INTENT CONTROLLER - With Chat History Integration
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * POST /intent/stream
- * Przetwarza intencję użytkownika z dostępem do historii rozmowy
+ * Flow:
+ * 1. Klasyfikuje intencję (SAVE_ONLY/SAVE_SEARCH/SAVE_MAIL)
+ * 2. Dodaje do kolejki AI (analiza + zapis)
+ * 3. Odpala Action Tools w tle (asynchronicznie)
+ * 4. Streamuje progres do klienta
  */
 export const intentController = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { text, sessionId } = req.body as { text: string; sessionId?: string };
+    const { text } = req.body as { text: string };
     const userId = req.user?._id;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: "Text is required" });
     }
 
     // Konfiguracja SSE
@@ -38,41 +34,24 @@ export const intentController = asyncHandler(
 
     try {
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 0: Pobierz historię rozmowy (ostatnie 10 wiadomości)
+      // KROK 1: Klasyfikacja intencji
       // ═══════════════════════════════════════════════════════════════════════
       
-      console.log('[IntentController] Fetching chat history...');
-      const chatHistory = await getChatHistory(userId, 10, sessionId);
-      console.log(`[IntentController] Retrieved ${chatHistory.length} messages from history`);
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // KROK 1: Klasyfikacja intencji (z historią!)
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      sendSSE({
-        stage: "intent_classification",
-        status: "processing",
-        content: "Analizuję intencję...",
-      });
+      //const chatHistory = await getChatHistory(userId); // Twoja implementacja
 
       const intentResult = await classifyIntent({
         userText: text.trim(),
         userId: userId.toString(),
-        chatHistory: chatHistory, // ← TUTAJ PRZEKAZUJEMY HISTORIĘ!
+        //chatHistory: chatHistory, 
       });
 
+      // Wyślij answer do frontendu
       sendSSE({
-        stage: "intent_classification",
+        stage: "jarvis_response",
         status: "complete",
-        content: `Wykryto: ${intentResult.action}`,
+        content: intentResult.answer, // ← Jarvis mówi do użytkownika!
         data: intentResult,
       });
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // KROK 1.5: Zapisz wiadomość użytkownika do historii
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      await addChatMessage(userId, 'user', text.trim(), sessionId);
 
       // ═══════════════════════════════════════════════════════════════════════
       // KROK 2: Sprawdź status kolejki
@@ -112,21 +91,6 @@ export const intentController = asyncHandler(
       });
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 3.5: Wyślij odpowiedź Jarvisa (z pola "answer")
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      if (intentResult.answer) {
-        sendSSE({
-          stage: "jarvis_response",
-          status: "complete",
-          content: intentResult.answer, // ← "Wszystko git, mordo!"
-        });
-
-        // Zapisz odpowiedź Jarvisa do historii
-        await addChatMessage(userId, 'assistant', intentResult.answer, sessionId);
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
       // KROK 4: Odpalam Action Tools w tle (NIE CZEKAMY!)
       // ═══════════════════════════════════════════════════════════════════════
       
@@ -145,13 +109,13 @@ export const intentController = asyncHandler(
           entryId,
           text: text.trim(),
           action: intentResult.action,
-          intentResult, // Przekazujemy pełny wynik (eventData, emailData)
+          intentResult
         });
 
         sendSSE({
           stage: "action_tools",
           status: "background",
-          content: `${intentResult.action} wykona się w tle.`,
+          content: `${intentResult.action} wykona się w tle. Sprawdź później szczegóły.`,
         });
       }
 
@@ -166,7 +130,6 @@ export const intentController = asyncHandler(
         data: {
           entryId,
           action: intentResult.action,
-          sessionId: sessionId || 'default',
         },
         done: true,
       });
