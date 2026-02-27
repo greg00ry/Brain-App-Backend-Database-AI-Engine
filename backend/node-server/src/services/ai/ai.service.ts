@@ -13,10 +13,14 @@ export function cleanAndParseJSON(content: string){
     clean = clean.substring(start, end + 1);
   }
   
+  clean = clean.replace(/,(\s*[}\]])/g, '$1')
+  clean = clean.replace(/\/\/.*$/gm, '')
+  clean = clean.replace(/\/\*[\s\S]*?\*\//g, '')
+
   try {
     return JSON.parse(clean);
   } catch (e) {
-    console.error("❌ [JSON FIX] AI wypluło śmieci, ale system żyje dalej.");
+    console.error("❌ [JSON FIX] Cleaned: ", clean);
     return null;
   }
 }
