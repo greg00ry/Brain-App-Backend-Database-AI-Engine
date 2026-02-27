@@ -5,14 +5,16 @@ import { classifyIntent } from "../services/ai/intent.service.js";
 import { aiQueue } from "../services/ai/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
 import { getChatHistory, addChatMessage } from "../services/chat/chat.history.service.js";
+import { VaultEntry } from "../models/VaultEntry.js";
+import { Types } from "mongoose";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INTENT CONTROLLER - With Chat History Integration
+// INTENT CONTROLLER - With Research Results Display
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * POST /intent/stream
- * Przetwarza intencję użytkownika z dostępem do historii rozmowy
+ * SSE Stream z wyświetlaniem wyników researchu
  */
 export const intentController = asyncHandler(
   async (req: AuthRequest, res: Response) => {
@@ -27,7 +29,7 @@ export const intentController = asyncHandler(
       return res.status(400).json({ error: "Text is required" });
     }
 
-    // Konfiguracja SSE
+    // SSE setup
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -38,64 +40,46 @@ export const intentController = asyncHandler(
 
     try {
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 0: Pobierz historię rozmowy (ostatnie 10 wiadomości)
+      // KROK 1: Historia czatu
       // ═══════════════════════════════════════════════════════════════════════
       
-      console.log('[IntentController] Fetching chat history...');
-      const chatHistory = await getChatHistory(userId, 10, sessionId);
-      console.log(`[IntentController] Retrieved ${chatHistory.length} messages from history`);
+      const chatHistory = await getChatHistory(userId, 5, sessionId); // Tylko 5 dla małych modeli!
+      console.log(`[IntentController] Chat history: ${chatHistory.length} messages`);
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 1: Klasyfikacja intencji (z historią!)
+      // KROK 2: Klasyfikacja intencji
       // ═══════════════════════════════════════════════════════════════════════
       
       sendSSE({
-        stage: "intent_classification",
+        stage: "intent",
         status: "processing",
-        content: "Analizuję intencję...",
+        content: "🧠 Analizuję...",
       });
 
       const intentResult = await classifyIntent({
         userText: text.trim(),
         userId: userId.toString(),
-        chatHistory: chatHistory, // ← TUTAJ PRZEKAZUJEMY HISTORIĘ!
+        chatHistory: chatHistory,
       });
 
       sendSSE({
-        stage: "intent_classification",
+        stage: "intent",
         status: "complete",
-        content: `Wykryto: ${intentResult.action}`,
-        data: intentResult,
+        content: `🧠 ${intentResult.action}`,
+        data: { action: intentResult.action },
       });
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // KROK 1.5: Zapisz wiadomość użytkownika do historii
-      // ═══════════════════════════════════════════════════════════════════════
-      
+      // Zapisz user message
       await addChatMessage(userId, 'user', text.trim(), sessionId);
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 2: Sprawdź status kolejki
-      // ═══════════════════════════════════════════════════════════════════════
-      
-      const queueStatus = aiQueue.getStatus();
-
-      if (queueStatus.queueLength > 0) {
-        sendSSE({
-          stage: "queue",
-          status: "waiting",
-          content: `W kolejce: ${queueStatus.queueLength} zadań`,
-        });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // KROK 3: Przetwarzanie przez AI (analiza + zapis do bazy)
+      // KROK 3: AI Processing + Zapis
       // ═══════════════════════════════════════════════════════════════════════
       
       sendSSE({
-        stage: "ai_processing",
-        status: "processing",
-        content: "Analizuję treść...",
+        stage: "processing",
+        status: "working",
+        content: "⚙️ Zapisuję...",
       });
 
       const queueResult = await aiQueue.enqueue(
@@ -104,81 +88,111 @@ export const intentController = asyncHandler(
         intentResult.action
       );
 
+      const entryId = queueResult.entry._id.toString();
+
       sendSSE({
-        stage: "ai_processing",
+        stage: "processing",
         status: "complete",
-        content: "Analiza zakończona",
-        data: queueResult,
+        content: "⚙️ Zapisane",
       });
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 3.5: Wyślij odpowiedź Jarvisa (z pola "answer")
+      // KROK 4: Odpowiedź Jarvisa
       // ═══════════════════════════════════════════════════════════════════════
       
       if (intentResult.answer) {
         sendSSE({
-          stage: "jarvis_response",
+          stage: "answer",
           status: "complete",
-          content: intentResult.answer, // ← "Wszystko git, mordo!"
+          content: `📝 ${intentResult.answer}`,
         });
 
-        // Zapisz odpowiedź Jarvisa do historii
         await addChatMessage(userId, 'assistant', intentResult.answer, sessionId);
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 4: Odpalam Action Tools w tle (NIE CZEKAMY!)
+      // KROK 5: Action Tools (w tle)
       // ═══════════════════════════════════════════════════════════════════════
       
-      const entryId = queueResult.entry._id.toString();
-
       if (intentResult.action !== "SAVE_ONLY") {
         sendSSE({
-          stage: "action_tools",
+          stage: "action",
           status: "triggered",
-          content: `Uruchamiam ${intentResult.action} w tle...`,
+          content: `🚀 ${intentResult.action}...`,
         });
 
-        // Odpalamy w tle - nie czekamy na wynik
+        // Odpalam w tle
         executeActionInBackground({
           userId: userId.toString(),
           entryId,
           text: text.trim(),
           action: intentResult.action,
-          intentResult, // Przekazujemy pełny wynik (eventData, emailData)
+          intentResult,
         });
 
-        sendSSE({
-          stage: "action_tools",
-          status: "background",
-          content: `${intentResult.action} wykona się w tle.`,
-        });
+        // ═══════════════════════════════════════════════════════════════════════
+        // KROK 6: Polling dla wyników researchu (dla SAVE_SEARCH i RESEARCH_BRAIN)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        if (intentResult.action === "SAVE_SEARCH" || intentResult.action === "RESEARCH_BRAIN") {
+          // Czekaj max 30s na wyniki
+          const maxWait = 30000;
+          const startTime = Date.now();
+          let resultsFound = false;
+
+          while (Date.now() - startTime < maxWait && !resultsFound) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Czekaj 1s
+
+            const entry = await VaultEntry.findById(new Types.ObjectId(entryId)).lean();
+            
+            if (entry?.actionTools?.search?.completed) {
+              resultsFound = true;
+              
+              // Wyślij wyniki do użytkownika!
+              if (entry.actionTools.search.facts && entry.actionTools.search.facts.length > 0) {
+                sendSSE({
+                  stage: "results",
+                  status: "complete",
+                  content: "✅ Znalazłem!",
+                  data: {
+                    facts: entry.actionTools.search.facts,
+                    sources: entry.actionTools.search.sources || [],
+                  },
+                });
+              }
+            }
+          }
+
+          if (!resultsFound) {
+            sendSSE({
+              stage: "results",
+              status: "timeout",
+              content: "⏱️ Research trwa dłużej...",
+            });
+          }
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════════════
-      // KROK 5: Zakończenie
+      // KROK 7: Zakończenie
       // ═══════════════════════════════════════════════════════════════════════
       
       sendSSE({
         stage: "complete",
         status: "done",
-        content: "Gotowe!",
-        data: {
-          entryId,
-          action: intentResult.action,
-          sessionId: sessionId || 'default',
-        },
+        content: "✅ Gotowe!",
+        data: { entryId },
         done: true,
       });
 
       res.end();
     } catch (error) {
-      console.error("[IntentController] Błąd:", error);
+      console.error("[IntentController] Error:", error);
 
       sendSSE({
         stage: "error",
         status: "failed",
-        content: "Wystąpił błąd podczas przetwarzania",
+        content: "❌ Błąd",
         error: error instanceof Error ? error.message : String(error),
       });
 
@@ -186,3 +200,5 @@ export const intentController = asyncHandler(
     }
   }
 );
+
+export default intentController;
