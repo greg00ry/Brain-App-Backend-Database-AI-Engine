@@ -4,14 +4,15 @@
 
 export type IntentAction = 
   | "SAVE_ONLY"       // Tylko zapis, bez akcji
-  | "SAVE_SEARCH"     // Research w internecie
+  | "SAVE_SEARCH"     // Research w internecie (Google/Tavily)
+  | "RESEARCH_BRAIN"  // Research w własnej bazie MongoDB (NEW!)
   | "SAVE_MAIL"       // Wysłanie emaila
-  | "CREATE_EVENT";   // Utworzenie wydarzenia w kalendarzu (NEW!)
+  | "CREATE_EVENT";   // Utworzenie wydarzenia w kalendarzu
 
 export interface IntentResult {
   action: IntentAction;
   reasoning: string;
-  answer: string;
+  answer: string;  // ← NOWE: Naturalna odpowiedź Jarvisa do użytkownika
   
   // ─── Event Data (tylko dla CREATE_EVENT) ────────────────────────────────────
   eventData?: {
@@ -26,6 +27,7 @@ export interface IntentResult {
   emailData?: {
     recipient?: string;     // Jeśli wykryty w tekście
     subject?: string;       // Sugerowany temat
+    body?: string;          // Treść emaila wygenerowana przez AI (NEW!)
   };
 }
 
