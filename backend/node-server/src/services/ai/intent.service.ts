@@ -150,7 +150,7 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
       LLM_API_URL,
       {
         model: LLM_MODEL,
-        temperature: 0.1,
+        temperature: 0.3,
         max_tokens: 150, // Krótsze odpowiedzi
         messages: [
           { role: "user", content: prompt }
