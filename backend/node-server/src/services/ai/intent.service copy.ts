@@ -2,7 +2,6 @@ import axios from "axios";
 import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
 import { cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
-import { response } from "express";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT SERVICE - Optimized for DeepSeek Coder V2 Lite (16B)
@@ -40,36 +39,65 @@ function buildDeepSeekPrompt(
     });
   }
 
-  
-
   // Context (max 400 chars)
   const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie danych.\n' 
     ? `\nMEMORY:\n${brainContext.substring(0, 400)}\n`
     : '';
 
-  return `### ROLE
-You are a deterministic routing engine for a Cognitive Agent. 
-Return ONLY JSON. No conversation, no explanations.
+  return `Classify user intent. Return JSON only.
 
-### PRIORITY RULES
-1. IF input contains '@' OR 'wyślij' OR 'mail' -> ALWAYS "action": "SAVE_MAIL".
-2. IF input asks about AI, past projects, or your own notes -> ALWAYS "action": "RESEARCH_BRAIN".
-3. IF input asks about current weather, news, or general web data -> "action": "SAVE_SEARCH".
-4. DEFAULT -> "action": "SAVE_ONLY".
+${history}${context}
+USER: "${userText}"
 
-### JSON STRUCTURE
+ACTIONS:
+- SAVE_SEARCH: internet search (weather, news, current info)
+- RESEARCH_BRAIN: search own memory (past notes)
+- SAVE_MAIL: send email (needs recipient, generate body)
+- CREATE_EVENT: calendar/reminder (needs date)
+- SAVE_ONLY: general chat
+
+RULES:
+- SAVE_SEARCH: "jaka", "gdzie", "kiedy", "podaj informacje", questions
+- SAVE_MAIL: "wyślij email", has @email
+- CREATE_EVENT: "przypomnij", "jutro", time mentioned
+- RESEARCH_BRAIN: "co mówiłeś", "znajdź w notatkach"
+- SAVE_ONLY: greetings, general talk
+
+JSON FORMAT:
 {
-  "action": "SAVE_SEARCH" | "RESEARCH_BRAIN" | "SAVE_MAIL" | "CREATE_EVENT" | "SAVE_ONLY",
-  "reasoning": "short explanation",
-  "answer": "Krótka odpowiedź po polsku, mordo",
-  "emailData": { "recipient": "", "subject": "", "body": "" },
-  "eventData": { "title": "", "startDate": "", "category": "reminder" }
+  "action": "ACTION_NAME",
+  "reasoning": "why",
+  "answer": "Polish response with 'mordo'",
+  "emailData": {
+    "recipient": "email@example.com",
+    "subject": "Subject",
+    "body": "Generated body"
+  },
+  "eventData": {
+    "title": "Title",
+    "startDate": "ISO date",
+    "category": "reminder"
+  }
 }
 
-### CRITICAL
-- If "action" is "SAVE_MAIL", you MUST extract the email address to "emailData.recipient".
-- DO NOT default to weather if keywords like 'AI', 'notatki', or 'pamięć' are present.
-- Polish response must ALWAYS include the word 'mordo'.`;
+EXAMPLES:
+
+User: "Jaka pogoda?"
+{"action":"SAVE_SEARCH","reasoning":"weather query","answer":"Sprawdzam pogodę, mordo."}
+
+User: "Wyślij email do john@example.com że projekt opóźniony"
+{"action":"SAVE_MAIL","reasoning":"email request","answer":"Wysyłam email, mordo.","emailData":{"recipient":"john@example.com","subject":"Projekt","body":"Projekt jest opóźniony."}}
+
+User: "Przypomnij jutro o 10"
+{"action":"CREATE_EVENT","reasoning":"reminder","answer":"Ustawiam, mordo.","eventData":{"title":"Przypomnienie","startDate":"2024-12-26T10:00:00Z","category":"reminder"}}
+
+User: "Co mówiłeś o AI?"
+{"action":"RESEARCH_BRAIN","reasoning":"memory query","answer":"Sprawdzam w pamięci, mordo."}
+
+User: "Hej"
+{"action":"SAVE_ONLY","reasoning":"greeting","answer":"Cześć, mordo."}
+
+RESPOND NOW:`;
 }
 
 // ─── Keyword Fallback ────────────────────────────────────────────────────────
@@ -81,61 +109,54 @@ const PATTERNS = {
   RESEARCH: /co (mi |)mówił|pamiętasz|znajdź|pokazał/i,
 };
 
-function keywordFallback(text: string): IntentResult | null {
+function keywordFallback(text: string): IntentResult {
   const lower = text.toLowerCase();
   
-  // 1. NAJWYŻSZY PRIORYTET: RESEARCH_BRAIN (Twoje notatki i AI)
-  const brainKeywords = ['notatki', 'mówiłeś', 'pamięć', 'projekt', 'wspominałeś', 'wiedza'];
-  if (brainKeywords.some(key => lower.includes(key))) {
-    return { 
-      action: "RESEARCH_BRAIN", 
-      reasoning: "Hardcoded keyword match (Memory)", 
-      answer: "Już szperam w mojej pamięci, mordo. Zaraz powiem Ci wszystko o tym projekcie." 
-    };
-  }
-  
-  // 2. MAIL (Wymaga znaku @ i słowa kluczowego)
-  const hasEmail = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/.exec(text);
-  if (hasEmail && (/wyślij|wyslij|mail|email/.test(lower))) {
+  if ((PATTERNS.MAIL.test(lower) && /@/.test(text)) || 
+      (/wyślij|wyslij/.test(lower) && /@/.test(text))) {
+    const email = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
     return { 
       action: "SAVE_MAIL", 
-      reasoning: "Hardcoded Email pattern",
-      answer: `Jasne mordo, przygotowuję maila do ${hasEmail[0]}.`,
-      emailData: { 
-        recipient: hasEmail[0], 
-        subject: "Wiadomość od Jarvisa", 
-        body: text 
-      }
+      reasoning: "Email pattern",
+      answer: `Wysyłam do ${email?.[0] || 'odbiorcy'}, mordo.`,
+      emailData: { recipient: email?.[0], subject: "Wiadomość", body: text }
     };
   }
   
-  // 3. KALENDARZ / PRZYPOMNIENIA
-  const eventKeywords = ['przypomnij', 'ustaw', 'kalendarz', 'jutro', 'godzinie'];
-  if (eventKeywords.some(key => lower.includes(key))) {
+  if (PATTERNS.EVENT.test(lower)) {
     return { 
       action: "CREATE_EVENT", 
-      reasoning: "Hardcoded Time keyword",
-      answer: "Ustawiam przypomnienie, mordo. Nie pozwolę Ci o tym zapomnieć.",
+      reasoning: "Time keyword",
+      answer: "Ustawiam, mordo.",
       eventData: {
-        title: text.length > 50 ? text.substring(0, 47) + "..." : text,
-        startDate: new Date(Date.now() + 86400000).toISOString(), // Domyślnie jutro
+        title: text.substring(0, 50),
+        startDate: new Date(Date.now() + 86400000).toISOString(),
         category: 'reminder'
       }
     };
   }
-
-  // 4. SEARCH (Pogoda i pytania ogólne z pytajnikiem)
-  const searchKeywords = ['pogoda', 'news', 'wiadomości', 'kto', 'co to', 'gdzie'];
-  if (searchKeywords.some(key => lower.includes(key)) || /\?$/.test(text.trim())) {
+  
+  if (PATTERNS.RESEARCH.test(lower)) {
     return { 
-      action: "SAVE_SEARCH", 
-      reasoning: "Hardcoded Search pattern",
-      answer: "Czekaj mordo, sprawdzę to w sieci, żebyś miał świeże info."
+      action: "RESEARCH_BRAIN", 
+      reasoning: "Memory query",
+      answer: "Sprawdzam w pamięci, mordo."
     };
   }
   
-  // Jeśli żadne słowo kluczowe nie pasuje, zwróć null -> wtedy uderzamy do LLM
-  return null
+  if (PATTERNS.SEARCH.test(lower) || /\?$/.test(text)) {
+    return { 
+      action: "SAVE_SEARCH", 
+      reasoning: "Search pattern",
+      answer: "Sprawdzam, mordo."
+    };
+  }
+  
+  return { 
+    action: "SAVE_ONLY", 
+    reasoning: "General chat",
+    answer: "Okej, mordo."
+  };
 }
 
 // ─── JSON Parser ─────────────────────────────────────────────────────────────
@@ -178,30 +199,17 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
   
   console.log('[IntentService] Classifying:', userText);
 
-  // 1. NAJPIERW KEYWORD FALLBACK (Szybka ścieżka, zero halucynacji)
-  const quickResult = keywordFallback(userText);
-  
-  const safeQuickResult: IntentResult = quickResult ?? { 
-  action: "SAVE_ONLY", 
-  reasoning: "Fallback", 
-  answer: "Okej mordo." 
-};
-
-  // Jeśli to nie jest domyślny chat, tylko konkretna akcja - zwróć od razu
-  if (safeQuickResult.action !== "SAVE_ONLY") {
-    console.log("[IntentService] ✓ Quick Match:", safeQuickResult.action);
-    return quickResult as IntentResult;
-  }
-
   try {
     const { synapticTree } = await getBrainContext(userId, userText);
     const prompt = buildDeepSeekPrompt(userText, synapticTree, chatHistory);
     
+    console.log('[IntentService] Prompt length:', prompt.length, 'chars');
+
     const response = await axios.post<LLMResponse>(
       LLM_API_URL,
       {
         model: LLM_MODEL,
-        temperature: 0.2, // Niska temperatura dla determinizmu
+        temperature: 0.2,
         max_tokens: 500,
         messages: [{ role: "user", content: prompt }],
       },
@@ -209,22 +217,24 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
     );
 
     const rawContent = response.data?.choices?.[0]?.message?.content ?? "";
+    console.log("[IntentService] Raw:", rawContent.substring(0, 150));
+
     const llmResult = parseIntentJSON(rawContent);
     
     if (llmResult) {
+      console.log("[IntentService] ✓ Parsed:", llmResult.action);
       return llmResult;
     }
+
+    console.warn("[IntentService] Parse failed → fallback");
   } catch (err) {
     console.error(`[IntentService] Error:`, err instanceof Error ? err.message : String(err));
   }
 
-  // Jeśli wszystko inne zawiedzie, zwróć wynik z fallbacka (SAVE_ONLY)
   const kwResult = keywordFallback(userText);
-  
-  // Rzutowanie 'as IntentResult' uciszy błąd TS(2322) i TS(2339)
-  return kwResult as IntentResult;
+  console.log("[IntentService] Fallback:", kwResult.action);
+  return kwResult;
 }
-
 
 export function validateEventData(eventData?: IntentResult["eventData"]): {
   isValid: boolean;
