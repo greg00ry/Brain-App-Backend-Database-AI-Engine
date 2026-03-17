@@ -3,7 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/typeHelper.js";
 import { AuthRequest } from "../middleware/auth.js";
 import { Response } from "express";
-import { getEntryById, getEntriesWithActionTools } from "../services/db/entry.service.js";
+import { storageAdapter } from "../services/db/storage.js";
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.get(
     const { entryId } = req.params;
     const userId = req.user?._id;
 
-    const entry = await getEntryById(entryId);
+    const entry = await storageAdapter.getEntryById(entryId);
 
     if (!entry) {
       return res.status(404).json({ error: "Entry not found" });
@@ -52,7 +52,7 @@ router.get(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const entries = await getEntriesWithActionTools(userId.toString());
+    const entries = await storageAdapter.getEntriesWithActionTools(userId.toString());
 
     res.json({
       count: entries.length,

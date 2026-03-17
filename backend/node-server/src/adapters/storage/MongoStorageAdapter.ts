@@ -1,13 +1,136 @@
 import mongoose from "mongoose";
 import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js";
 import { Category, ICategory } from "../../models/Category.js";
-import { LongTermMemory } from "../../models/LongTermMemory.js";
+import { LongTermMemory, ILongTermMemory } from "../../models/LongTermMemory.js";
 import { Synapse } from "../../models/Synapse.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
-import { IStorageAdapter, CategoryInfo } from "./IStorageAdapter.js";
+import {
+  IStorageAdapter,
+  CategoryInfo,
+  EntryAnalysisData,
+  ActionTool,
+  ActionStatus,
+  SearchResultData,
+  EmailResultData,
+  CalendarResultData,
+} from "./IStorageAdapter.js";
 import { BRAIN, MEMORY } from "../../config/constants.js";
 
 export class MongoStorageAdapter implements IStorageAdapter {
+
+  // ─── Entry CRUD ───────────────────────────────────────────────────────────
+
+  async createEntry(userId: string, rawText: string, analysis: EntryAnalysisData): Promise<IVaultEntry> {
+    const entry = new VaultEntry({ userId, rawText, analysis });
+    return entry.save();
+  }
+
+  async getEntryById(entryId: string): Promise<IVaultEntry | null> {
+    return VaultEntry.findById(entryId);
+  }
+
+  async getEntriesWithActionTools(userId: string): Promise<IVaultEntry[]> {
+    return VaultEntry.find({
+      userId,
+      $or: [
+        { "actionTools.search.completed": true },
+        { "actionTools.email.completed": true },
+      ],
+    }).sort({ createdAt: -1 });
+  }
+
+  // ─── Vault Controller ─────────────────────────────────────────────────────
+
+  async getVaultData(userId: string | mongoose.Types.ObjectId): Promise<{
+    entries: IVaultEntry[];
+    memories: ILongTermMemory[];
+    categories: ICategory[];
+  }> {
+    const [entries, memories, categories] = await Promise.all([
+      VaultEntry.find({ userId }).sort({ createdAt: -1 }),
+      LongTermMemory.find({ userId }).populate('categoryId').sort({ createdAt: -1 }),
+      Category.find({ isActive: true }).sort({ order: 1 }),
+    ]);
+    return { entries, memories, categories };
+  }
+
+  async deleteVaultEntry(entryId: string, userId: string | mongoose.Types.ObjectId): Promise<IVaultEntry | null> {
+    return VaultEntry.findOneAndDelete({ _id: entryId, userId });
+  }
+
+  // ─── Action Tools ─────────────────────────────────────────────────────────
+
+  async updateEntryActionStatus(entryId: string, tool: ActionTool, status: ActionStatus): Promise<void> {
+    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
+      [`actionTools.${tool}.status`]: status,
+      "actionTools.uiHint": status === 'processing' ? 'thinking' : 'pulse',
+    });
+  }
+
+  async updateEntrySearchResult(entryId: string, data: SearchResultData): Promise<void> {
+    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
+      "actionTools.search": {
+        status: 'completed',
+        completed: true,
+        facts: data.facts,
+        searchResults: data.searchResults,
+        sources: data.sources,
+        timestamp: new Date(),
+      },
+      "actionTools.uiHint": data.uiHint,
+    });
+  }
+
+  async updateEntryEmailResult(entryId: string, data: EmailResultData): Promise<void> {
+    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
+      "actionTools.email": {
+        status: 'completed',
+        completed: true,
+        sent: data.sent,
+        recipient: data.recipient,
+        messageId: data.messageId,
+        timestamp: new Date(),
+      },
+      "actionTools.uiHint": data.uiHint,
+    });
+  }
+
+  async updateEntryCalendarResult(entryId: string, data: CalendarResultData): Promise<void> {
+    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
+      "actionTools.calendar": {
+        status: 'completed',
+        completed: true,
+        eventId: data.eventId,
+        eventTitle: data.eventTitle,
+        eventDate: data.eventDate,
+        timestamp: new Date(),
+      },
+      "actionTools.uiHint": data.uiHint,
+    });
+  }
+
+  async updateEntryActionError(entryId: string, tool: ActionTool, data: { error: string; uiHint: string }): Promise<void> {
+    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
+      [`actionTools.${tool}`]: {
+        status: 'failed',
+        completed: false,
+        error: data.error,
+        timestamp: new Date(),
+      },
+      "actionTools.uiHint": data.uiHint,
+    });
+  }
+
+  async pollEntrySearchResult(entryId: string): Promise<{ completed: boolean; facts?: string[]; sources?: string[] } | null> {
+    const entry = await VaultEntry.findById(new mongoose.Types.ObjectId(entryId)).lean();
+    if (!entry) return null;
+    const search = entry.actionTools?.search;
+    return {
+      completed: search?.completed ?? false,
+      facts: search?.facts,
+      sources: search?.sources,
+    };
+  }
 
   // ─── Shared ───────────────────────────────────────────────────────────────
 
@@ -22,6 +145,23 @@ export class MongoStorageAdapter implements IStorageAdapter {
 
   async getUniqueUserIds(): Promise<mongoose.Types.ObjectId[]> {
     return VaultEntry.distinct('userId');
+  }
+
+  // ─── Intent Context ───────────────────────────────────────────────────────
+
+  async findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]> {
+    const pattern = keywords.join('|');
+    return VaultEntry.find({
+      userId,
+      $or: [
+        { 'analysis.tags': { $in: keywords } },
+        { 'analysis.summary': { $regex: pattern, $options: 'i' } },
+        { rawText: { $regex: pattern, $options: 'i' } },
+      ],
+    })
+      .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
+      .limit(MEMORY.CONTEXT_TOP_ENTRIES)
+      .lean() as unknown as IVaultEntry[];
   }
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
@@ -55,16 +195,12 @@ export class MongoStorageAdapter implements IStorageAdapter {
       updateOne: {
         filter: { _id: new mongoose.Types.ObjectId(id) },
         update: {
-          $set: {
-            'analysis.category': topic.category,
-            isAnalyzed: true,
-          },
+          $set: { 'analysis.category': topic.category, isAnalyzed: true },
           $addToSet: { 'analysis.tags': { $each: topic.tags } },
           $inc: { 'analysis.strength': topic.importance || 1 },
         },
       },
     }));
-
     if (ops.length === 0) return 0;
     await VaultEntry.bulkWrite(ops);
     return ops.length;
@@ -87,7 +223,6 @@ export class MongoStorageAdapter implements IStorageAdapter {
   ): Promise<void> {
     const categoryDoc = await Category.findOne({ name: category, isActive: true });
     const existing = await LongTermMemory.findOne({ userId, topic });
-
     if (existing) {
       existing.summary = memoryData.summary;
       existing.tags = [...new Set([...existing.tags, ...memoryData.tags])];
@@ -112,23 +247,6 @@ export class MongoStorageAdapter implements IStorageAdapter {
       { _id: { $in: entries.map(e => e._id) } },
       { $set: { isConsolidated: true } }
     );
-  }
-
-  // ─── Intent Context ───────────────────────────────────────────────────────
-
-  async findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]> {
-    const pattern = keywords.join('|');
-    return VaultEntry.find({
-      userId,
-      $or: [
-        { 'analysis.tags': { $in: keywords } },
-        { 'analysis.summary': { $regex: pattern, $options: 'i' } },
-        { rawText: { $regex: pattern, $options: 'i' } },
-      ],
-    })
-      .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
-      .limit(MEMORY.CONTEXT_TOP_ENTRIES)
-      .lean() as unknown as IVaultEntry[];
   }
 
   // ─── Subconscious Routine ─────────────────────────────────────────────────

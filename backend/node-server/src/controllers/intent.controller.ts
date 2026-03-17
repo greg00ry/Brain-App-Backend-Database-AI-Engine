@@ -5,8 +5,7 @@ import { classifyIntent } from "../services/ai/intent.service.js";
 import { aiQueue } from "../services/ai/queue.service.js";
 import { executeActionInBackground } from "../services/actions/action.executor.service.js";
 import { getChatHistory, addChatMessage } from "../services/chat/chat.history.service.js";
-import { VaultEntry } from "../models/VaultEntry.js";
-import { Types } from "mongoose";
+import { storageAdapter } from "../services/db/storage.js";
 import { CHAT, SSE } from "../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -143,20 +142,18 @@ export const intentController = asyncHandler(
           while (Date.now() - startTime < maxWait && !resultsFound) {
             await new Promise(resolve => setTimeout(resolve, SSE.POLL_INTERVAL_MS));
 
-            const entry = await VaultEntry.findById(new Types.ObjectId(entryId)).lean();
-            
-            if (entry?.actionTools?.search?.completed) {
+            const poll = await storageAdapter.pollEntrySearchResult(entryId);
+
+            if (poll?.completed) {
               resultsFound = true;
-              
-              // Wyślij wyniki do użytkownika!
-              if (entry.actionTools.search.facts && entry.actionTools.search.facts.length > 0) {
+              if (poll.facts && poll.facts.length > 0) {
                 sendSSE({
                   stage: "results",
                   status: "complete",
                   content: "✅ Znalazłem!",
                   data: {
-                    facts: entry.actionTools.search.facts,
-                    sources: entry.actionTools.search.sources || [],
+                    facts: poll.facts,
+                    sources: poll.sources || [],
                   },
                 });
               }
