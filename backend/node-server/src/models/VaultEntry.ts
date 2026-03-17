@@ -119,7 +119,7 @@ vaultEntrySchema.pre('findOneAndUpdate', function(next) {
 });
 
 // Export model
-export const VaultEntry = mongoose.model('VaultEntry', vaultEntrySchema);
+export const VaultEntry = mongoose.model<IVaultEntry>('VaultEntry', vaultEntrySchema);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TypeScript Types (opcjonalnie dla TypeScript)

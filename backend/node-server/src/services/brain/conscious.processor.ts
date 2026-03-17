@@ -51,26 +51,11 @@ export interface ConsciousStats {
  */
 async function getDeltaEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]> {
   const twentyFourHoursAgo = new Date(Date.now() - BRAIN.DELTA_WINDOW_MS);
-  
-  // Only get entries that:
-  // 1. Have NOT been analyzed yet, OR
-  // 2. Had activity in the last 24 hours
-  const deltaEntries = await VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo);
-
-  
-  
-  return deltaEntries as unknown as IVaultEntry[];
+  return VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo);
 }
 
-/**
- * Get existing entries for context (not in delta, but recently relevant).
- * Used to find connections between new and existing entries.
- */
 async function getContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]): Promise<IVaultEntry[]> {
-  // Get top 20 strongest entries not in delta for context
-  const contextEntries = await VaultRepo.findContextEntries(userId, excludeIds);
-  
-  return contextEntries as unknown as IVaultEntry[];
+  return VaultRepo.findContextEntries(userId, excludeIds);
 }
 
 /**
@@ -273,7 +258,7 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
           if (!entriesByCategory.has(cat)) {
             entriesByCategory.set(cat, []);
           }
-          entriesByCategory.get(cat)!.push(entry as unknown as IVaultEntry);
+          entriesByCategory.get(cat)!.push(entry);
         }
 
         for (const [category, entries] of entriesByCategory) {

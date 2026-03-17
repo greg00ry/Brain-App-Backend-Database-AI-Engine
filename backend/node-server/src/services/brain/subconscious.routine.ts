@@ -61,7 +61,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
         .map(entry => ({
           updateOne: {
             filter: { _id: entry._id },
-            update: { $inc: { strength: -1 } },
+            update: { $inc: { 'analysis.strength': -1 } },
           },
         }));
 
