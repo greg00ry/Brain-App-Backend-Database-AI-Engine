@@ -17,7 +17,6 @@ import calendarRouter from "./routes/calendar.route.js"
 
 //Jobs
 import { runNightlyRoutine } from "./jobs/nightlyRoutine.job.js";
-import { timeStamp } from "console";
 
 console.log("----------------------------------");
 console.log("📧 Konfiguracja SMTP:", process.env.SMTP_USER ? "Wczytana ✅" : "BRAK ❌");
