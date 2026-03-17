@@ -3,7 +3,7 @@ import { IVaultEntry, VaultEntry } from "../../models/VaultEntry.js";
 import { Category } from "../../models/Category.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
 import { SynapseLink, processSynapseLinks } from "../synapses/synapse.service.js";
-import { callLMStudio, cleanAndParseJSON } from "../ai/ai.service.js";
+import { llmAdapter, cleanAndParseJSON } from "../ai/ai.service.js";
 import { VaultRepo } from "../db/vault.repo.js";
 import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
 import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
@@ -101,26 +101,21 @@ async function analyzeWithSynapses(
 
   try {
     console.log('👁️ [Świadomość]    Wysyłam do AI:', deltaEntries.length, 'nowych +', contextEntries.length, 'kontekstowych');
-    
-    const response = await callLMStudio({
-        prompt: prompt,
-        content: "You analyze entries and find semantic connections. Return ONLY valid JSON with topics and synapses arrays. Be selective with connections - only meaningful ones.",
-        temperature: LLM.ANALYSIS_TEMPERATURE,
-        max_tokens: LLM.ANALYSIS_MAX_TOKENS
+
+    const content = await llmAdapter.complete({
+      systemPrompt: "You analyze entries and find semantic connections. Return ONLY valid JSON with topics and synapses arrays. Be selective with connections - only meaningful ones.",
+      userPrompt: prompt,
+      temperature: LLM.ANALYSIS_TEMPERATURE,
+      maxTokens: LLM.ANALYSIS_MAX_TOKENS,
     });
 
-    if (!response.ok) {
+    if (!content) {
       console.error('👁️ [Świadomość] ⚠️ LM Studio niedostępne');
       return { topics: [], synapses: [] };
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    
-    const parsed = cleanAndParseJSON(content);
-    
-    return parsed || { topics: [], synapses: [] };
-    
+    return cleanAndParseJSON(content) || { topics: [], synapses: [] };
+
   } catch (error) {
     console.error('👁️ [Świadomość] ❌ Błąd analizy:', error);
     return { topics: [], synapses: [] };
@@ -145,18 +140,15 @@ async function createLongTermMemorySummary(
   const prompt = LONG_TERM_MEMORY_SUMMARY_PROMPT(topic, categoryName, JSON.stringify(entriesContent));
 
   try {
-    const response = await callLMStudio({
-      prompt: prompt,
-      content: 'Consolidate memories into concise summary. JSON only.',
+    const content = await llmAdapter.complete({
+      systemPrompt: 'Consolidate memories into concise summary. JSON only.',
+      userPrompt: prompt,
       temperature: LLM.LTM_TEMPERATURE,
-      max_tokens: LLM.LTM_MAX_TOKENS
+      maxTokens: LLM.LTM_MAX_TOKENS,
     });
 
-    if (!response.ok) return null;
+    if (!content) return null;
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    
     const jsonMatch = cleanAndParseJSON(content);
     if (!jsonMatch) {
       console.error("👁️ [Świadomość] ❌ Błąd parsowania LTM");

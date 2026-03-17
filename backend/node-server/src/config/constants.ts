@@ -13,7 +13,11 @@ export const LLM = {
   INTENT_TEMPERATURE: 0.2,
   INTENT_MAX_TOKENS: 500,
 
-  // Brain analysis (conscious processor)
+  // Text analysis (analyzeTextWithAI)
+  TEXT_ANALYZE_TEMPERATURE: 0.7,
+  TEXT_ANALYZE_MAX_TOKENS: 500,
+
+  // Brain analysis (conscious processor - analyzeWithSynapses)
   ANALYSIS_TEMPERATURE: 0.1,
   ANALYSIS_MAX_TOKENS: 3000,
 

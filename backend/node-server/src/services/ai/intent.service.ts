@@ -1,6 +1,5 @@
-import axios from "axios";
-import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
-import { cleanAndParseJSON } from "./ai.service.js";
+import { IntentAction, IntentResult } from "./intent.types.js";
+import { llmAdapter, cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
 import { LLM, CHAT, MEMORY, MISC } from "../../config/constants.js";
 
@@ -182,20 +181,14 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
     const { synapticTree } = await getBrainContext(userId, userText);
     const prompt = buildDeepSeekPrompt(userText, synapticTree, chatHistory);
     
-    const response = await axios.post<LLMResponse>(
-      LLM.API_URL,
-      {
-        model: LLM.MODEL,
-        temperature: LLM.INTENT_TEMPERATURE,
-        max_tokens: LLM.INTENT_MAX_TOKENS,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { timeout: LLM.TIMEOUT }
-    );
+    const rawContent = await llmAdapter.complete({
+      userPrompt: prompt,
+      temperature: LLM.INTENT_TEMPERATURE,
+      maxTokens: LLM.INTENT_MAX_TOKENS,
+    });
 
-    const rawContent = response.data?.choices?.[0]?.message?.content ?? "";
-    const llmResult = parseIntentJSON(rawContent);
-    
+    const llmResult = rawContent ? parseIntentJSON(rawContent) : null;
+
     if (llmResult) {
       return llmResult;
     }

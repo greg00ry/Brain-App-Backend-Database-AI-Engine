@@ -1,5 +1,4 @@
 import { LongTermMemory } from "../../models/LongTermMemory.js";
-import { VaultEntry } from "../../models/VaultEntry.js";
 import { VaultRepo } from "../db/vault.repo.js";
 import { MISC } from "../../config/constants.js";
 
@@ -80,12 +79,10 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     
     const pruneResult = await VaultRepo.pruneResults()
     
-    stats.pruned  = (pruneResult.deadEntries?.deletedCount || 0) + (pruneResult.deadSynapses?.deletedCount || 0);
+    stats.pruned = (pruneResult.deadEntries?.deletedCount || 0) + (pruneResult.deadSynapses?.deletedCount || 0);
     if (stats.pruned > 0) {
-  console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} elementów (wpisy + synapsy)`);
-  
-  
-}
+      console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} elementów (wpisy + synapsy)`);
+    }
 
     // ========================================
     // PHASE 3: MARK FOR CONSOLIDATION
@@ -100,9 +97,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
       console.log(`🌘 [Podświadomość]    ↳ ${stats.readyForLTM} wspomnień gotowych do konsolidacji w LTM`);
     }
 
-    // Get total count
-    // DO POPRAWY PRZY IMPLEMENTACJI LOGOWANIA
-    stats.totalProcessed = await VaultRepo.getTotalProcessedCount()
+    stats.totalProcessed = await VaultRepo.getTotalProcessedCount();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`🌘 [Podświadomość] ✅ Zakończono w ${duration}s`);
