@@ -1,10 +1,8 @@
-import mongoose from "mongoose";
-import { IVaultEntry, VaultEntry } from "../../models/VaultEntry.js";
-import { Category } from "../../models/Category.js";
-import { LongTermMemory } from "../../models/LongTermMemory.js";
+import { IVaultEntry } from "../../models/VaultEntry.js";
 import { SynapseLink, processSynapseLinks } from "../synapses/synapse.service.js";
 import { llmAdapter, cleanAndParseJSON } from "../ai/ai.service.js";
-import { VaultRepo } from "../db/vault.repo.js";
+import { storageAdapter, CategoryInfo } from "../db/storage.js";
+import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
 import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
 import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
 import { BRAIN, LLM } from "../../config/constants.js";
@@ -15,47 +13,15 @@ import { BRAIN, LLM } from "../../config/constants.js";
 // ============================================================================
 
 
-interface CategoryInfo {
-  name: string;
-  description: string;
-  keywords: string[];
-}
-
-export interface TopicAnalysis {
-  topic: string;
-  category: string;
-  entryIds: string[];
-  tags: string[];
-  importance: number; // 1-10
-}
-
 interface AnalysisResult {
   topics: TopicAnalysis[];
   synapses: SynapseLink[];
-}
-
-export interface LongTermMemoryData {
-  summary: string;
-  tags: string[];
 }
 
 export interface ConsciousStats {
   analyzed: number;
   consolidated: number;
   synapsesCreated: number;
-}
-
-/**
- * Get only the "delta" - entries that need AI attention.
- * This minimizes the context window sent to LM Studio.
- */
-async function getDeltaEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]> {
-  const twentyFourHoursAgo = new Date(Date.now() - BRAIN.DELTA_WINDOW_MS);
-  return VaultRepo.findVaultEntryForDeltaEntries(userId, twentyFourHoursAgo);
-}
-
-async function getContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]): Promise<IVaultEntry[]> {
-  return VaultRepo.findContextEntries(userId, excludeIds);
 }
 
 /**
@@ -69,8 +35,6 @@ async function analyzeWithSynapses(
 ): Promise<AnalysisResult> {
   if (deltaEntries.length === 0) return { topics: [], synapses: [] };
 
-  // Prepare delta entries (new/recently active)
-  // ✅ DOPASOWANE: używamy analysis.summary i analysis.tags
   const deltaSummaries = deltaEntries.map(e => ({
     id: e._id.toString(),
     text: e.analysis?.summary || e.rawText.substring(0, 150),
@@ -78,8 +42,6 @@ async function analyzeWithSynapses(
     isNew: true,
   }));
 
-  // Prepare context entries (existing, for connection finding)
-  // ✅ DOPASOWANE: używamy analysis.summary, analysis.tags, analysis.category
   const contextSummaries = contextEntries.map(e => ({
     id: e._id.toString(),
     text: e.analysis?.summary || e.rawText.substring(0, 100),
@@ -94,7 +56,7 @@ async function analyzeWithSynapses(
     .join('\n');
 
   const prompt = ANALYZE_WITH_SYNAPSES_PROMPT(
-    categoryList, 
+    categoryList,
     JSON.stringify(deltaSummaries, null, 1),
     JSON.stringify(contextSummaries, null, 1)
   );
@@ -130,8 +92,6 @@ async function createLongTermMemorySummary(
   topic: string,
   categoryName: string
 ): Promise<LongTermMemoryData | null> {
-  // Take only essential data
-  // ✅ DOPASOWANE: używamy analysis.summary i analysis.tags
   const entriesContent = entries.slice(0, BRAIN.LTM_MAX_SOURCE_ENTRIES).map(e => ({
     summary: e.analysis?.summary?.substring(0, 200) || e.rawText.substring(0, 200),
     tags: e.analysis?.tags?.slice(0, 3) || [],
@@ -175,15 +135,13 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
   };
 
   try {
-    // Load categories
-    const categories = await VaultRepo.getCategoriesForAI();
+    const categories = await storageAdapter.getCategories();
     if (categories.length === 0) {
       console.log('👁️ [Świadomość] ⚠️ Brak kategorii. Uruchom: npm run seed:categories');
       return stats;
     }
 
-    // Get unique users
-    const userIds = await VaultRepo.getUniqueUser();
+    const userIds = await storageAdapter.getUniqueUserIds();
     console.log(`👁️ [Świadomość] Przetwarzam ${userIds.length} użytkowników`);
 
     for (const userId of userIds) {
@@ -192,70 +150,54 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
       // ========================================
       // STEP 1: ANALYZE DELTA + FIND SYNAPSES
       // ========================================
-      const deltaEntries = await getDeltaEntries(userId);
+      const since = new Date(Date.now() - BRAIN.DELTA_WINDOW_MS);
+      const deltaEntries = await storageAdapter.findDeltaEntries(userId, since);
 
       if (deltaEntries.length === 0) {
         console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
       } else {
         console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
 
-        // --- START BATCHING ---
         for (let i = 0; i < deltaEntries.length; i += BRAIN.BATCH_SIZE) {
           const currentBatch = deltaEntries.slice(i, i + BRAIN.BATCH_SIZE);
           console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BRAIN.BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
 
-          // Get context entries for synapse discovery
           const deltaIds = currentBatch.map(e => e._id.toString());
-          const contextEntries = await getContextEntries(userId, deltaIds);
-          
-          // ANALIZA POJEDYNCZEJ PACZKI
-          const analysisResult = await analyzeWithSynapses(currentBatch, contextEntries, categories);
-          const { topics, synapses } = analysisResult;
-          
+          const contextEntries = await storageAdapter.findContextEntries(userId, deltaIds);
+
+          const { topics, synapses } = await analyzeWithSynapses(currentBatch, contextEntries, categories);
           console.log(`👁️ [Batch] Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
 
-          // Aktualizacja wpisów wynikami z paczki
           for (const topic of topics) {
-            const updateOps = VaultRepo.mapEntryIds(topic);
-            if (updateOps.length > 0) {
-              await VaultRepo.bulkWriteVaultEntriesForConscious(updateOps);
-              stats.analyzed += updateOps.length;
-            }
+            const count = await storageAdapter.applyTopicAnalysis(topic);
+            stats.analyzed += count;
           }
 
-          // Procesowanie synaps z paczki
           if (synapses.length > 0) {
             const deltaIdSet = new Set(deltaIds);
             const synapsesCreated = await processSynapseLinks(synapses, deltaIdSet);
             stats.synapsesCreated += synapsesCreated;
           }
         }
-        // --- END BATCHING ---
       }
 
       // ========================================
       // STEP 2: CONSOLIDATE STRONG MEMORIES INTO LTM
       // Only process entries marked by subconscious (strength >= 10)
       // ========================================
-      const strongEntries = await VaultRepo.findStrongEntries(userId);
+      const strongEntries = await storageAdapter.findStrongEntries(userId);
 
       if (strongEntries.length > 0) {
         console.log(`👁️ [Świadomość]    Konsolidacja: ${strongEntries.length} silnych wspomnień`);
 
-        // Group by category for consolidation
-        // ✅ DOPASOWANE: używamy analysis.category
         const entriesByCategory = new Map<string, IVaultEntry[]>();
         for (const entry of strongEntries) {
           const cat = entry.analysis?.category || 'Uncategorized';
-          if (!entriesByCategory.has(cat)) {
-            entriesByCategory.set(cat, []);
-          }
+          if (!entriesByCategory.has(cat)) entriesByCategory.set(cat, []);
           entriesByCategory.get(cat)!.push(entry);
         }
 
         for (const [category, entries] of entriesByCategory) {
-          // Create topic name from common tags
-          // ✅ DOPASOWANE: używamy analysis.tags
           const allTags = entries.flatMap(e => e.analysis?.tags || []);
           const tagCounts = new Map<string, number>();
           allTags.forEach(tag => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1));
@@ -263,40 +205,17 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 3)
             .map(([tag]) => tag);
-          
-          const topic = topTags.join(' + ') || category;
 
+          const topic = topTags.join(' + ') || category;
           console.log(`👁️ [Świadomość]    🧠 Tworzę LTM: "${topic}" [${category}]`);
 
           const memoryData = await createLongTermMemorySummary(entries, topic, category);
 
           if (memoryData) {
-            const categoryDoc = await VaultRepo.findCategoryDoc(category);
+            await storageAdapter.upsertLTM(userId, topic, category, memoryData, entries);
+            console.log(`👁️ [Świadomość]    ✅ LTM zapisane`);
 
-            // Check for existing memory
-            const existingMemory = await VaultRepo.findExistingMemory(userId, topic);
-
-            if (existingMemory) {
-              existingMemory.summary = memoryData.summary;
-              existingMemory.tags = [...new Set([...existingMemory.tags, ...memoryData.tags])];
-              existingMemory.sourceEntryIds = entries.map(e => e._id);
-              await VaultRepo.saveExistingMemory(existingMemory);
-              console.log(`👁️ [Świadomość]    ✅ Zaktualizowano istniejące LTM`);
-            } else {
-              await VaultRepo.createNewLongTermMemory(
-                userId,
-                memoryData,
-                categoryDoc,
-                category,
-                entries,
-                topic
-              );
-              console.log(`👁️ [Świadomość]    ✅ Utworzono nowe LTM`);
-            }
-
-            // Mark entries as consolidated
-            await VaultRepo.updateManyVaultEntries(entries);
-
+            await storageAdapter.markConsolidated(entries);
             stats.consolidated += entries.length;
           }
         }
