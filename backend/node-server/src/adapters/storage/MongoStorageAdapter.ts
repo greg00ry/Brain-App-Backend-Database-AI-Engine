@@ -114,6 +114,23 @@ export class MongoStorageAdapter implements IStorageAdapter {
     );
   }
 
+  // ─── Intent Context ───────────────────────────────────────────────────────
+
+  async findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]> {
+    const pattern = keywords.join('|');
+    return VaultEntry.find({
+      userId,
+      $or: [
+        { 'analysis.tags': { $in: keywords } },
+        { 'analysis.summary': { $regex: pattern, $options: 'i' } },
+        { rawText: { $regex: pattern, $options: 'i' } },
+      ],
+    })
+      .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
+      .limit(MEMORY.CONTEXT_TOP_ENTRIES)
+      .lean() as unknown as IVaultEntry[];
+  }
+
   // ─── Subconscious Routine ─────────────────────────────────────────────────
 
   async getConsolidatedEntryIds(): Promise<string[]> {

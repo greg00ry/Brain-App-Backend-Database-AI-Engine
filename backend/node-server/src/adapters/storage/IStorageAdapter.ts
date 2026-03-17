@@ -28,6 +28,10 @@ export interface IStorageAdapter {
   ): Promise<void>;
   markConsolidated(entries: IVaultEntry[]): Promise<void>;
 
+  // ─── Intent Context ───────────────────────────────────────────────────────
+  /** Full-text + tag search for intent context retrieval. Returns top N entries by strength. */
+  findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]>;
+
   // ─── Subconscious Routine ─────────────────────────────────────────────────
   getConsolidatedEntryIds(): Promise<string[]>;
   findEntriesToDecay(since: Date): Promise<IVaultEntry[]>;

@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
-import { Synapse, ISynapse } from "../../models/Synapse.js";
-import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js";
+import { Synapse } from "../../models/Synapse.js";
+import { IVaultEntry } from "../../models/VaultEntry.js";
+import { storageAdapter } from "../db/storage.js";
 import { MEMORY } from "../../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -151,17 +152,7 @@ export async function getBrainContext(
     console.log('[ContextService] Keywords:', keywords);
 
     // 2. Wyszukaj relevantne wpisy (Top 3)
-    const entries = await VaultEntry.find({
-      userId,
-      $or: [
-        { 'analysis.tags': { $in: keywords } },
-        { 'analysis.summary': { $regex: keywords.join('|'), $options: 'i' } },
-        { rawText: { $regex: keywords.join('|'), $options: 'i' } },
-      ],
-    })
-      .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
-      .limit(MEMORY.CONTEXT_TOP_ENTRIES)
-      .lean();
+    const entries = await storageAdapter.findRelevantEntries(userId, keywords);
 
     console.log('[ContextService] Found entries:', entries.length);
 
@@ -195,7 +186,7 @@ export async function getBrainContext(
     }
 
     return {
-      relevantEntries: entries as unknown as IVaultEntry[],
+      relevantEntries: entries,
       synapticTree: synapticTreeFormatted,
       hasContext: true,
     };
