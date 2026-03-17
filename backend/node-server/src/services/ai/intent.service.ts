@@ -3,9 +3,9 @@ import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
 import { cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════=
 // INTENT SERVICE - Optimized for DeepSeek Coder V2 Lite (16B)
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════=
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
