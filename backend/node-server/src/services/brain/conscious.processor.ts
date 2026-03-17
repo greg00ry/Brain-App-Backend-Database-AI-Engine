@@ -1,7 +1,7 @@
 import { IVaultEntry } from "../../models/VaultEntry.js";
 import { SynapseLink, processSynapseLinks } from "../synapses/synapse.service.js";
-import { llmAdapter, cleanAndParseJSON } from "../ai/ai.service.js";
-import { storageAdapter, CategoryInfo } from "../db/storage.js";
+import { ILLMAdapter, cleanAndParseJSON } from "../ai/ai.service.js";
+import { IStorageAdapter, CategoryInfo } from "../db/storage.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
 import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
 import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
@@ -31,7 +31,8 @@ export interface ConsciousStats {
 async function analyzeWithSynapses(
   deltaEntries: IVaultEntry[],
   contextEntries: IVaultEntry[],
-  categories: CategoryInfo[]
+  categories: CategoryInfo[],
+  llm: ILLMAdapter
 ): Promise<AnalysisResult> {
   if (deltaEntries.length === 0) return { topics: [], synapses: [] };
 
@@ -64,7 +65,7 @@ async function analyzeWithSynapses(
   try {
     console.log('👁️ [Świadomość]    Wysyłam do AI:', deltaEntries.length, 'nowych +', contextEntries.length, 'kontekstowych');
 
-    const content = await llmAdapter.complete({
+    const content = await llm.complete({
       systemPrompt: "You analyze entries and find semantic connections. Return ONLY valid JSON with topics and synapses arrays. Be selective with connections - only meaningful ones.",
       userPrompt: prompt,
       temperature: LLM.ANALYSIS_TEMPERATURE,
@@ -90,7 +91,8 @@ async function analyzeWithSynapses(
 async function createLongTermMemorySummary(
   entries: IVaultEntry[],
   topic: string,
-  categoryName: string
+  categoryName: string,
+  llm: ILLMAdapter
 ): Promise<LongTermMemoryData | null> {
   const entriesContent = entries.slice(0, BRAIN.LTM_MAX_SOURCE_ENTRIES).map(e => ({
     summary: e.analysis?.summary?.substring(0, 200) || e.rawText.substring(0, 200),
@@ -100,7 +102,7 @@ async function createLongTermMemorySummary(
   const prompt = LONG_TERM_MEMORY_SUMMARY_PROMPT(topic, categoryName, JSON.stringify(entriesContent));
 
   try {
-    const content = await llmAdapter.complete({
+    const content = await llm.complete({
       systemPrompt: 'Consolidate memories into concise summary. JSON only.',
       userPrompt: prompt,
       temperature: LLM.LTM_TEMPERATURE,
@@ -124,7 +126,7 @@ async function createLongTermMemorySummary(
 /**
  * Conscious processor - AI-driven, processes only DELTA entries.
  */
-export async function runConsciousProcessor(): Promise<ConsciousStats> {
+export async function runConsciousProcessor(llm: ILLMAdapter, storage: IStorageAdapter): Promise<ConsciousStats> {
   console.log('\n👁️ [Świadomość] Uruchamiam świadomy procesor...');
   const startTime = Date.now();
 
@@ -135,13 +137,13 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
   };
 
   try {
-    const categories = await storageAdapter.getCategories();
+    const categories = await storage.getCategories();
     if (categories.length === 0) {
       console.log('👁️ [Świadomość] ⚠️ Brak kategorii. Uruchom: npm run seed:categories');
       return stats;
     }
 
-    const userIds = await storageAdapter.getUniqueUserIds();
+    const userIds = await storage.getUniqueUserIds();
     console.log(`👁️ [Świadomość] Przetwarzam ${userIds.length} użytkowników`);
 
     for (const userId of userIds) {
@@ -151,7 +153,7 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
       // STEP 1: ANALYZE DELTA + FIND SYNAPSES
       // ========================================
       const since = new Date(Date.now() - BRAIN.DELTA_WINDOW_MS);
-      const deltaEntries = await storageAdapter.findDeltaEntries(userId, since);
+      const deltaEntries = await storage.findDeltaEntries(userId, since);
 
       if (deltaEntries.length === 0) {
         console.log('👁️ [Świadomość]    Brak nowych wpisów do analizy');
@@ -163,13 +165,13 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
           console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BRAIN.BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
 
           const deltaIds = currentBatch.map(e => e._id.toString());
-          const contextEntries = await storageAdapter.findContextEntries(userId, deltaIds);
+          const contextEntries = await storage.findContextEntries(userId, deltaIds);
 
-          const { topics, synapses } = await analyzeWithSynapses(currentBatch, contextEntries, categories);
+          const { topics, synapses } = await analyzeWithSynapses(currentBatch, contextEntries, categories, llm);
           console.log(`👁️ [Batch] Zidentyfikowano ${topics.length} tematów, ${synapses.length} połączeń`);
 
           for (const topic of topics) {
-            const count = await storageAdapter.applyTopicAnalysis(topic);
+            const count = await storage.applyTopicAnalysis(topic);
             stats.analyzed += count;
           }
 
@@ -185,7 +187,7 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
       // STEP 2: CONSOLIDATE STRONG MEMORIES INTO LTM
       // Only process entries marked by subconscious (strength >= 10)
       // ========================================
-      const strongEntries = await storageAdapter.findStrongEntries(userId);
+      const strongEntries = await storage.findStrongEntries(userId);
 
       if (strongEntries.length > 0) {
         console.log(`👁️ [Świadomość]    Konsolidacja: ${strongEntries.length} silnych wspomnień`);
@@ -209,13 +211,13 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
           const topic = topTags.join(' + ') || category;
           console.log(`👁️ [Świadomość]    🧠 Tworzę LTM: "${topic}" [${category}]`);
 
-          const memoryData = await createLongTermMemorySummary(entries, topic, category);
+          const memoryData = await createLongTermMemorySummary(entries, topic, category, llm);
 
           if (memoryData) {
-            await storageAdapter.upsertLTM(userId, topic, category, memoryData, entries);
+            await storage.upsertLTM(userId, topic, category, memoryData, entries);
             console.log(`👁️ [Świadomość]    ✅ LTM zapisane`);
 
-            await storageAdapter.markConsolidated(entries);
+            await storage.markConsolidated(entries);
             stats.consolidated += entries.length;
           }
         }

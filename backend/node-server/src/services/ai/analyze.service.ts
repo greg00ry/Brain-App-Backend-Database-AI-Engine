@@ -1,4 +1,4 @@
-import { llmAdapter, cleanAndParseJSON } from "./ai.service.js";
+import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
 import { ANALYZE_PROMPT } from "./prompts/analyzePrompt.js";
 import { LLM } from "../../config/constants.js";
 
@@ -18,8 +18,8 @@ const FALLBACK_ANALYSIS = (text: string): AIAnalysis => ({
   isProcessed: false,
 });
 
-export const analyzeTextWithAI = async (text: string): Promise<AIAnalysis> => {
-  const content = await llmAdapter.complete({
+export const analyzeTextWithAI = async (text: string, llm: ILLMAdapter): Promise<AIAnalysis> => {
+  const content = await llm.complete({
     systemPrompt: 'You are a technical assistant that analyzes text and returns structured JSON data. Always respond with valid JSON only.',
     userPrompt: ANALYZE_PROMPT(text),
     temperature: LLM.TEXT_ANALYZE_TEMPERATURE,

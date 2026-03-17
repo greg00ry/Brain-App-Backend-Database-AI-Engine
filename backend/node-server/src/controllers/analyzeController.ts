@@ -1,6 +1,6 @@
 import { AuthRequest } from "../middleware/auth.js";
 import { Request, Response } from "express";
-import { proccessAndStore } from "../services/ingest/ingest.service.js";
+import { brain } from "../core/brain.instance.js";
 
 export const analyzeController = async (req: Request, res: Response) => {
   try {
@@ -11,7 +11,7 @@ export const analyzeController = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "invalid input" });
     }
 
-    const result = await proccessAndStore(user._id.toString(), text);
+    const result = await brain.save(user._id.toString(), text);
     return res.status(200).json(result);
   } catch (error) {
     console.error('Error analyzing text:', error);

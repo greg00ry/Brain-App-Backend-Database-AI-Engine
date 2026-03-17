@@ -1,6 +1,7 @@
 import { IntentAction, IntentResult } from "./intent.types.js";
-import { llmAdapter, cleanAndParseJSON } from "./ai.service.js";
+import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
+import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
 import { LLM, CHAT, MEMORY } from "../../config/constants.js";
 
 export interface ChatMessage {
@@ -94,17 +95,21 @@ function parseIntentJSON(raw: string): IntentResult | null {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export async function classifyIntent(params: ClassifyIntentParams): Promise<IntentResult> {
+export async function classifyIntent(
+  params: ClassifyIntentParams,
+  llm: ILLMAdapter,
+  storage: IStorageAdapter
+): Promise<IntentResult> {
   const { userText, userId, chatHistory = [] } = params;
 
   const quickResult = keywordFallback(userText);
   if (quickResult !== null) return quickResult;
 
   try {
-    const { synapticTree } = await getBrainContext(userId, userText);
+    const { synapticTree } = await getBrainContext(userId, userText, storage);
     const prompt = buildPrompt(userText, synapticTree, chatHistory);
 
-    const rawContent = await llmAdapter.complete({
+    const rawContent = await llm.complete({
       userPrompt: prompt,
       temperature: LLM.INTENT_TEMPERATURE,
       maxTokens: LLM.INTENT_MAX_TOKENS,

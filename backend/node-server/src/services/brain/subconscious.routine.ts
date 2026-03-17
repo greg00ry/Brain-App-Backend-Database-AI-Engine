@@ -1,4 +1,4 @@
-import { storageAdapter } from "../db/storage.js";
+import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
 import { MISC } from "../../config/constants.js";
 
 
@@ -19,7 +19,7 @@ export interface SubconsciousStats {
  * Subconscious routine - runs WITHOUT AI, pure logic/math operations.
  * Handles: Decay, Pruning, and marking entries ready for consolidation.
  */
-export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
+export async function runSubconsciousRoutine(storage: IStorageAdapter): Promise<SubconsciousStats> {
   console.log('\n🌘 [Podświadomość] Uruchamiam rutynę podświadomości...');
   const startTime = Date.now();
 
@@ -31,7 +31,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
   };
 
   try {
-    const consolidatedIds = await storageAdapter.getConsolidatedEntryIds();
+    const consolidatedIds = await storage.getConsolidatedEntryIds();
     const consolidatedIdSet = new Set(consolidatedIds);
     console.log('🌘 [Podświadomość] Znaleziono', consolidatedIdSet.size, 'wpisów już w pamięci długotrwałej');
 
@@ -42,7 +42,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     console.log('🌘 [Podświadomość] Faza 1: DECAY (zanikanie wspomnień)...');
 
     const oneDayAgo = new Date(Date.now() - MISC.ONE_DAY_MS);
-    const entriesToDecay = await storageAdapter.findEntriesToDecay(oneDayAgo);
+    const entriesToDecay = await storage.findEntriesToDecay(oneDayAgo);
 
     if (entriesToDecay.length > 0) {
       const idsToDecay = entriesToDecay
@@ -50,7 +50,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
         .map(e => e._id);
 
       if (idsToDecay.length > 0) {
-        stats.decayed = await storageAdapter.decayEntries(idsToDecay);
+        stats.decayed = await storage.decayEntries(idsToDecay);
         console.log(`🌘 [Podświadomość]    ↳ Osłabiono ${stats.decayed} wspomnień (strength -1)`);
       }
     }
@@ -61,8 +61,8 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     // ========================================
     console.log('🌘 [Podświadomość] Faza 2: PRUNING (usuwanie zapomnianych)...');
 
-    const prunedEntries = await storageAdapter.pruneDeadEntries();
-    const prunedSynapses = await storageAdapter.pruneDeadSynapses();
+    const prunedEntries = await storage.pruneDeadEntries();
+    const prunedSynapses = await storage.pruneDeadSynapses();
     stats.pruned = prunedEntries + prunedSynapses;
 
     if (stats.pruned > 0) {
@@ -75,13 +75,13 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     // ========================================
     console.log('🌘 [Podświadomość] Faza 3: Oznaczanie silnych wspomnień...');
 
-    const strongEntries = await storageAdapter.findEntriesReadyForLTM();
+    const strongEntries = await storage.findEntriesReadyForLTM();
     if (strongEntries.length > 0) {
       stats.readyForLTM = strongEntries.length;
       console.log(`🌘 [Podświadomość]    ↳ ${stats.readyForLTM} wspomnień gotowych do konsolidacji w LTM`);
     }
 
-    stats.totalProcessed = await storageAdapter.countEntries();
+    stats.totalProcessed = await storage.countEntries();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`🌘 [Podświadomość] ✅ Zakończono w ${duration}s`);

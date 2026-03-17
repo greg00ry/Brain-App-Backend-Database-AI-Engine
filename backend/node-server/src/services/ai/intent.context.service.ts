@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { Synapse } from "../../models/Synapse.js";
 import { IVaultEntry } from "../../models/VaultEntry.js";
-import { storageAdapter } from "../db/storage.js";
+import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
 import { MEMORY } from "../../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -93,7 +93,8 @@ export function formatSynapticTree(nodes: SynapseNode[], indent = ''): string {
 
 export async function getBrainContext(
   userId: string | Types.ObjectId,
-  userText: string
+  userText: string,
+  storage: IStorageAdapter
 ): Promise<{
   relevantEntries: IVaultEntry[];
   synapticTree: string;
@@ -106,7 +107,7 @@ export async function getBrainContext(
       return { relevantEntries: [], synapticTree: '💭 Brak słów kluczowych do wyszukania.\n', hasContext: false };
     }
 
-    const entries = await storageAdapter.findRelevantEntries(userId, keywords);
+    const entries = await storage.findRelevantEntries(userId, keywords);
 
     if (entries.length === 0) {
       return { relevantEntries: [], synapticTree: '💭 Brak relevantnych wspomnień w bazie.\n', hasContext: false };
