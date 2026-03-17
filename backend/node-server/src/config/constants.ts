@@ -70,13 +70,6 @@ export const CHAT = {
   HISTORY_RECENT_FOR_PROMPT: 3,    // messages included in prompt
 } as const;
 
-// ─── Intent Controller (SSE polling) ─────────────────────────────────────────
-
-export const SSE = {
-  POLL_TIMEOUT_MS: 30_000,
-  POLL_INTERVAL_MS: 1_000,
-} as const;
-
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 
 export const MISC = {

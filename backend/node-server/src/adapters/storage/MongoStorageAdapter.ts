@@ -4,16 +4,7 @@ import { Category, ICategory } from "../../models/Category.js";
 import { LongTermMemory, ILongTermMemory } from "../../models/LongTermMemory.js";
 import { Synapse } from "../../models/Synapse.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
-import {
-  IStorageAdapter,
-  CategoryInfo,
-  EntryAnalysisData,
-  ActionTool,
-  ActionStatus,
-  SearchResultData,
-  EmailResultData,
-  CalendarResultData,
-} from "./IStorageAdapter.js";
+import { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./IStorageAdapter.js";
 import { BRAIN, MEMORY } from "../../config/constants.js";
 
 export class MongoStorageAdapter implements IStorageAdapter {
@@ -29,17 +20,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
     return VaultEntry.findById(entryId);
   }
 
-  async getEntriesWithActionTools(userId: string): Promise<IVaultEntry[]> {
-    return VaultEntry.find({
-      userId,
-      $or: [
-        { "actionTools.search.completed": true },
-        { "actionTools.email.completed": true },
-      ],
-    }).sort({ createdAt: -1 });
-  }
-
-  // ─── Vault Controller ─────────────────────────────────────────────────────
+  // ─── Vault ────────────────────────────────────────────────────────────────
 
   async getVaultData(userId: string | mongoose.Types.ObjectId): Promise<{
     entries: IVaultEntry[];
@@ -56,80 +37,6 @@ export class MongoStorageAdapter implements IStorageAdapter {
 
   async deleteVaultEntry(entryId: string, userId: string | mongoose.Types.ObjectId): Promise<IVaultEntry | null> {
     return VaultEntry.findOneAndDelete({ _id: entryId, userId });
-  }
-
-  // ─── Action Tools ─────────────────────────────────────────────────────────
-
-  async updateEntryActionStatus(entryId: string, tool: ActionTool, status: ActionStatus): Promise<void> {
-    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
-      [`actionTools.${tool}.status`]: status,
-      "actionTools.uiHint": status === 'processing' ? 'thinking' : 'pulse',
-    });
-  }
-
-  async updateEntrySearchResult(entryId: string, data: SearchResultData): Promise<void> {
-    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
-      "actionTools.search": {
-        status: 'completed',
-        completed: true,
-        facts: data.facts,
-        searchResults: data.searchResults,
-        sources: data.sources,
-        timestamp: new Date(),
-      },
-      "actionTools.uiHint": data.uiHint,
-    });
-  }
-
-  async updateEntryEmailResult(entryId: string, data: EmailResultData): Promise<void> {
-    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
-      "actionTools.email": {
-        status: 'completed',
-        completed: true,
-        sent: data.sent,
-        recipient: data.recipient,
-        messageId: data.messageId,
-        timestamp: new Date(),
-      },
-      "actionTools.uiHint": data.uiHint,
-    });
-  }
-
-  async updateEntryCalendarResult(entryId: string, data: CalendarResultData): Promise<void> {
-    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
-      "actionTools.calendar": {
-        status: 'completed',
-        completed: true,
-        eventId: data.eventId,
-        eventTitle: data.eventTitle,
-        eventDate: data.eventDate,
-        timestamp: new Date(),
-      },
-      "actionTools.uiHint": data.uiHint,
-    });
-  }
-
-  async updateEntryActionError(entryId: string, tool: ActionTool, data: { error: string; uiHint: string }): Promise<void> {
-    await VaultEntry.findByIdAndUpdate(new mongoose.Types.ObjectId(entryId), {
-      [`actionTools.${tool}`]: {
-        status: 'failed',
-        completed: false,
-        error: data.error,
-        timestamp: new Date(),
-      },
-      "actionTools.uiHint": data.uiHint,
-    });
-  }
-
-  async pollEntrySearchResult(entryId: string): Promise<{ completed: boolean; facts?: string[]; sources?: string[] } | null> {
-    const entry = await VaultEntry.findById(new mongoose.Types.ObjectId(entryId)).lean();
-    if (!entry) return null;
-    const search = entry.actionTools?.search;
-    return {
-      completed: search?.completed ?? false,
-      facts: search?.facts,
-      sources: search?.sources,
-    };
   }
 
   // ─── Shared ───────────────────────────────────────────────────────────────
