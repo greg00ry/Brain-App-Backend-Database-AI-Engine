@@ -2,7 +2,6 @@ import axios from "axios";
 import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
 import { cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
-import { response } from "express";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT SERVICE - Optimized for DeepSeek Coder V2 Lite (16B)
@@ -55,7 +54,8 @@ Return ONLY JSON. No conversation, no explanations.
 1. IF input contains '@' OR 'wyślij' OR 'mail' -> ALWAYS "action": "SAVE_MAIL".
 2. IF input asks about AI, past projects, or your own notes -> ALWAYS "action": "RESEARCH_BRAIN".
 3. IF input asks about current weather, news, or general web data -> "action": "SAVE_SEARCH".
-4. DEFAULT -> "action": "SAVE_ONLY".
+4. IF input mentions time, date, reminder, calendar, 'jutro', 'spotkanie' -> "action": "CREATE_EVENT".
+5. DEFAULT -> "action": "SAVE_ONLY".
 
 ### JSON STRUCTURE
 {
@@ -73,13 +73,6 @@ Return ONLY JSON. No conversation, no explanations.
 }
 
 // ─── Keyword Fallback ────────────────────────────────────────────────────────
-
-const PATTERNS = {
-  MAIL: /wyślij|wyslij|email|mail|napisz do|send\s+email/i,
-  EVENT: /przypomnij|kalendarz|jutro|dziś|spotkanie|remind|tomorrow/i,
-  SEARCH: /pogoda|cena|jaka|gdzie|kiedy|podaj|info|atak|news|sprawdź/i,
-  RESEARCH: /co (mi |)mówił|pamiętasz|znajdź|pokazał/i,
-};
 
 function keywordFallback(text: string): IntentResult | null {
   const lower = text.toLowerCase();
@@ -181,16 +174,10 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
   // 1. NAJPIERW KEYWORD FALLBACK (Szybka ścieżka, zero halucynacji)
   const quickResult = keywordFallback(userText);
   
-  const safeQuickResult: IntentResult = quickResult ?? { 
-  action: "SAVE_ONLY", 
-  reasoning: "Fallback", 
-  answer: "Okej mordo." 
-};
-
   // Jeśli to nie jest domyślny chat, tylko konkretna akcja - zwróć od razu
-  if (safeQuickResult.action !== "SAVE_ONLY") {
-    console.log("[IntentService] ✓ Quick Match:", safeQuickResult.action);
-    return quickResult as IntentResult;
+  if (quickResult !== null) {
+    console.log("[IntentService] ✓ Quick Match:", quickResult.action);
+    return quickResult;
   }
 
   try {
@@ -218,11 +205,8 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
     console.error(`[IntentService] Error:`, err instanceof Error ? err.message : String(err));
   }
 
-  // Jeśli wszystko inne zawiedzie, zwróć wynik z fallbacka (SAVE_ONLY)
-  const kwResult = keywordFallback(userText);
-  
-  // Rzutowanie 'as IntentResult' uciszy błąd TS(2322) i TS(2339)
-  return kwResult as IntentResult;
+  // Jeśli wszystko inne zawiedzie, zwróć SAVE_ONLY
+  return { action: "SAVE_ONLY", reasoning: "Fallback", answer: "Okej mordo." };
 }
 
 
