@@ -17,17 +17,7 @@
 
 ---
 
-## Mission
 
-This is NOT just another AI wrapper.
-
-**The Brain** is a resistance movement against AI centralization.
-
-While Big Tech rebuilds Soviet-style central planning (cloud APIs, subscriptions, surveillance), we're building infrastructure for **privacy-first, user-owned AI**.
-
-Read [CLAUDE.md](CLAUDE.md) for full mission statement.
-
----
 
 ## What Makes This Different
 
@@ -150,25 +140,6 @@ npm run dev
 
 ---
 
-## Philosophy
-
-**Red Lines (Never Cross):**
-
-1. ❌ No cloud LLM APIs (unless user explicitly chooses)
-2. ❌ No user data collection
-3. ❌ No VC funding
-4. ❌ No selling to Big Tech
-
-**Core Principles:**
-
-- Privacy > Convenience
-- User ownership > Subscriptions
-- Independence > Scale
-- Freedom > Features
-
-This is **digital Solidarność** (Polish Solidarity movement).
-
----
 
 ## Why Framework?
 
@@ -186,7 +157,7 @@ This is **digital Solidarność** (Polish Solidarity movement).
 
 Currently in active refactoring. 
 
-Check [CLAUDE.md](CLAUDE.md) for mission, philosophy, and technical context.
+
 
 **Current focus:** Framework extraction on `framework-extraction` branch
 
@@ -201,12 +172,6 @@ AGPL-3.0 (deliberately protective - prevents corporate capture)
 ## Author
 
 **Grzegorz Trzaskoma**
-
-Polish developer who grew up post-communist, building resistance to AI centralization.
-
-*"My babcia escaped Soviet central planning. I won't rebuild it with better UX."*
-
-**Forbes 2029 goal:** Independent founder who decentralized AI
 
 ---
 
