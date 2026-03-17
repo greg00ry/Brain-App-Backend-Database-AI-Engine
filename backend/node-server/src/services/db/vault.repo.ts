@@ -4,6 +4,7 @@ import { Category, ICategory } from "../../models/Category.js";
 import { TopicAnalysis, LongTermMemoryData } from "../brain/conscious.processor.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
 import { ISynapse, Synapse } from "../../models/Synapse.js";
+import { BRAIN, MEMORY } from "../../config/constants.js";
 
 export const VaultRepo = {
      async getCategoriesForAI(): Promise<{ name: string; description: string; keywords: string[] }[]> {
@@ -23,7 +24,7 @@ export const VaultRepo = {
     ],
   })
     .sort({ lastActivityAt: -1 })
-    .limit(50); // Hard limit to prevent context explosion
+    .limit(MEMORY.DELTA_ENTRIES_LIMIT);
     
     return entries
     },
@@ -32,10 +33,10 @@ export const VaultRepo = {
             userId,
             _id: { $nin: excludeIds.map(id => new mongoose.Types.ObjectId(id)) },
             isAnalyzed: true,
-            strength: { $gte: 3 }, // Only consider entries with some strength
+            strength: { $gte: BRAIN.STRENGTH_CONTEXT_MIN },
           })
             .sort({ strength: -1, lastActivityAt: -1 })
-            .limit(20)
+            .limit(MEMORY.CONTEXT_ENTRIES_LIMIT)
             .select('_id summary rawText tags category');
         
           return contextEntries;
@@ -66,7 +67,7 @@ export const VaultRepo = {
     async findStrongEntries(userId: mongoose.Types.ObjectId) {
         const strongEntries = await VaultEntry.find({
             userId,
-            strength: { $gte: 10 },
+            strength: { $gte: BRAIN.STRENGTH_LTM_THRESHOLD },
             isConsolidated: false,
         });
         return strongEntries
@@ -101,7 +102,7 @@ export const VaultRepo = {
                 categoryName: category,
                 topic,
                 sourceEntryIds: entries.map(e => e._id),
-                strength: 10,
+                strength: BRAIN.LTM_INITIAL_STRENGTH,
               });
     },
     async updateManyVaultEntries(entries: IVaultEntry[]) {
@@ -134,7 +135,7 @@ export const VaultRepo = {
     // 2. USUWANIE SYNAPS (Tego brakowało!)
     // Usuwamy synapsy, których waga/siła spadła do zera
     const deadSynapses = await Synapse.deleteMany({
-        weight: { $lte: 0.1 } // Próg odcięcia - do doprecyzowania
+        weight: { $lte: BRAIN.SYNAPSE_PRUNE_WEIGHT }
     });
 
     
@@ -149,7 +150,7 @@ export const VaultRepo = {
     },
     async markStrongEntries() {
         return await VaultEntry.find({
-            strength: { $gte: 10 },
+            strength: { $gte: BRAIN.STRENGTH_LTM_THRESHOLD },
             isConsolidated: false,
         }).select('_id');
     },

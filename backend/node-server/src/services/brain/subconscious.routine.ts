@@ -1,6 +1,7 @@
 import { LongTermMemory } from "../../models/LongTermMemory.js";
 import { VaultEntry } from "../../models/VaultEntry.js";
 import { VaultRepo } from "../db/vault.repo.js";
+import { MISC } from "../../config/constants.js";
 
 
 
@@ -48,7 +49,7 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     // ========================================
     console.log('🌘 [Podświadomość] Faza 1: DECAY (zanikanie wspomnień)...');
     
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - MISC.ONE_DAY_MS);
     
     // Find entries to decay: not consolidated, not recently active, strength > 0
     const entriesToDecay = await VaultRepo.findEntriesToDecay(oneDayAgo)

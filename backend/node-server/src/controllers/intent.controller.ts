@@ -7,6 +7,7 @@ import { executeActionInBackground } from "../services/actions/action.executor.s
 import { getChatHistory, addChatMessage } from "../services/chat/chat.history.service.js";
 import { VaultEntry } from "../models/VaultEntry.js";
 import { Types } from "mongoose";
+import { CHAT, SSE } from "../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT CONTROLLER - With Research Results Display
@@ -43,7 +44,7 @@ export const intentController = asyncHandler(
       // KROK 1: Historia czatu
       // ═══════════════════════════════════════════════════════════════════════
       
-      const chatHistory = await getChatHistory(userId, 5, sessionId); // Tylko 5 dla małych modeli!
+      const chatHistory = await getChatHistory(userId, CHAT.HISTORY_LIMIT_FOR_LLM, sessionId);
       console.log(`[IntentController] Chat history: ${chatHistory.length} messages`);
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -135,13 +136,12 @@ export const intentController = asyncHandler(
         // ═══════════════════════════════════════════════════════════════════════
         
         if (intentResult.action === "SAVE_SEARCH" || intentResult.action === "RESEARCH_BRAIN") {
-          // Czekaj max 30s na wyniki
-          const maxWait = 30000;
+          const maxWait = SSE.POLL_TIMEOUT_MS;
           const startTime = Date.now();
           let resultsFound = false;
 
           while (Date.now() - startTime < maxWait && !resultsFound) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Czekaj 1s
+            await new Promise(resolve => setTimeout(resolve, SSE.POLL_INTERVAL_MS));
 
             const entry = await VaultEntry.findById(new Types.ObjectId(entryId)).lean();
             

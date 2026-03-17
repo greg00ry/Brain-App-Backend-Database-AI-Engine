@@ -2,6 +2,7 @@ import axios from "axios";
 import { IntentAction, IntentResult, LLMResponse } from "./intent.types.js";
 import { cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
+import { LLM, CHAT, MEMORY, MISC } from "../../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════=
 // INTENT SERVICE - Optimized for DeepSeek Coder V2 Lite (16B)
@@ -18,9 +19,6 @@ export interface ClassifyIntentParams {
   chatHistory?: ChatMessage[];
 }
 
-const LLM_API_URL = process.env.LLM_API_URL ?? "http://localhost:1234/v1/chat/completions";
-const LLM_MODEL = process.env.LLM_MODEL ?? "local-model";
-const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT ?? 30_000);
 
 // ─── System Prompt for DeepSeek Coder ───────────────────────────────────────
 
@@ -32,7 +30,7 @@ function buildDeepSeekPrompt(
   // Historia (ostatnie 3)
   let history = '';
   if (chatHistory && chatHistory.length > 0) {
-    const recent = chatHistory.slice(-3);
+    const recent = chatHistory.slice(-CHAT.HISTORY_RECENT_FOR_PROMPT);
     history = '\nCONVERSATION:\n';
     recent.forEach(msg => {
       history += `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.content}\n`;
@@ -42,8 +40,8 @@ function buildDeepSeekPrompt(
   
 
   // Context (max 400 chars)
-  const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie danych.\n' 
-    ? `\nMEMORY:\n${brainContext.substring(0, 400)}\n`
+  const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie danych.\n'
+    ? `\nMEMORY:\n${brainContext.substring(0, MEMORY.BRAIN_CONTEXT_MAX_CHARS)}\n`
     : '';
 
   return `### ROLE
@@ -111,7 +109,7 @@ function keywordFallback(text: string): IntentResult | null {
       answer: "Ustawiam przypomnienie, mordo. Nie pozwolę Ci o tym zapomnieć.",
       eventData: {
         title: text.length > 50 ? text.substring(0, 47) + "..." : text,
-        startDate: new Date(Date.now() + 86400000).toISOString(), // Domyślnie jutro
+        startDate: new Date(Date.now() + MISC.EVENT_DEFAULT_OFFSET_MS).toISOString(),
         category: 'reminder'
       }
     };
@@ -185,14 +183,14 @@ export async function classifyIntent(params: ClassifyIntentParams): Promise<Inte
     const prompt = buildDeepSeekPrompt(userText, synapticTree, chatHistory);
     
     const response = await axios.post<LLMResponse>(
-      LLM_API_URL,
+      LLM.API_URL,
       {
-        model: LLM_MODEL,
-        temperature: 0.2, // Niska temperatura dla determinizmu
-        max_tokens: 500,
+        model: LLM.MODEL,
+        temperature: LLM.INTENT_TEMPERATURE,
+        max_tokens: LLM.INTENT_MAX_TOKENS,
         messages: [{ role: "user", content: prompt }],
       },
-      { timeout: LLM_TIMEOUT }
+      { timeout: LLM.TIMEOUT }
     );
 
     const rawContent = response.data?.choices?.[0]?.message?.content ?? "";

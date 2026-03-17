@@ -1,4 +1,4 @@
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 import { IVaultEntry, VaultEntry } from "../../models/VaultEntry.js";
 import { Category } from "../../models/Category.js";
 import { LongTermMemory } from "../../models/LongTermMemory.js";
@@ -7,6 +7,7 @@ import { callLMStudio, cleanAndParseJSON } from "../ai/ai.service.js";
 import { VaultRepo } from "../db/vault.repo.js";
 import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
 import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
+import { BRAIN, LLM } from "../../config/constants.js";
 
 
 // ============================================================================
@@ -49,7 +50,7 @@ export interface ConsciousStats {
  * This minimizes the context window sent to LM Studio.
  */
 async function getDeltaEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]> {
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = new Date(Date.now() - BRAIN.DELTA_WINDOW_MS);
   
   // Only get entries that:
   // 1. Have NOT been analyzed yet, OR
@@ -119,8 +120,8 @@ async function analyzeWithSynapses(
     const response = await callLMStudio({
         prompt: prompt,
         content: "You analyze entries and find semantic connections. Return ONLY valid JSON with topics and synapses arrays. Be selective with connections - only meaningful ones.",
-        temperature: 0.1,
-        max_tokens: 3000
+        temperature: LLM.ANALYSIS_TEMPERATURE,
+        max_tokens: LLM.ANALYSIS_MAX_TOKENS
     });
 
     if (!response.ok) {
@@ -151,7 +152,7 @@ async function createLongTermMemorySummary(
 ): Promise<LongTermMemoryData | null> {
   // Take only essential data
   // ✅ DOPASOWANE: używamy analysis.summary i analysis.tags
-  const entriesContent = entries.slice(0, 10).map(e => ({
+  const entriesContent = entries.slice(0, BRAIN.LTM_MAX_SOURCE_ENTRIES).map(e => ({
     summary: e.analysis?.summary?.substring(0, 200) || e.rawText.substring(0, 200),
     tags: e.analysis?.tags?.slice(0, 3) || [],
   }));
@@ -162,8 +163,8 @@ async function createLongTermMemorySummary(
     const response = await callLMStudio({
       prompt: prompt,
       content: 'Consolidate memories into concise summary. JSON only.',
-      temperature: 0.3,
-      max_tokens: 800
+      temperature: LLM.LTM_TEMPERATURE,
+      max_tokens: LLM.LTM_MAX_TOKENS
     });
 
     if (!response.ok) return null;
@@ -222,10 +223,9 @@ export async function runConsciousProcessor(): Promise<ConsciousStats> {
         console.log(`👁️ [Świadomość]    Delta: ${deltaEntries.length} wpisów do analizy`);
 
         // --- START BATCHING ---
-        const BATCH_SIZE = 5; // Bezpieczna ilość, żeby DeepSeek nie wypluł za długiego JSONa
-        for (let i = 0; i < deltaEntries.length; i += BATCH_SIZE) {
-          const currentBatch = deltaEntries.slice(i, i + BATCH_SIZE);
-          console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
+        for (let i = 0; i < deltaEntries.length; i += BRAIN.BATCH_SIZE) {
+          const currentBatch = deltaEntries.slice(i, i + BRAIN.BATCH_SIZE);
+          console.log(`🧠 [Batch] Przetwarzam paczkę ${Math.floor(i / BRAIN.BATCH_SIZE) + 1} (${currentBatch.length} wpisów)...`);
 
           // Get context entries for synapse discovery
           const deltaIds = currentBatch.map(e => e._id.toString());

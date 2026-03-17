@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Synapse, ISynapse } from "../../models/Synapse.js";
 import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js";
+import { MEMORY } from "../../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT CONTEXT SERVICE - Recursive Branching Retrieval (3x3)
@@ -33,7 +34,7 @@ export async function getSynapticTree(
   currentLevel = 1
 ): Promise<SynapseNode[]> {
   // Warunek zatrzymania: osiągnięto max depth lub już odwiedzono
-  if (depth > 3 || visited.has(startEntryId)) {
+  if (depth > MEMORY.SYNAPSE_TREE_DEPTH || visited.has(startEntryId)) {
     return [];
   }
 
@@ -45,8 +46,8 @@ export async function getSynapticTree(
     const synapses = await Synapse.find({
       from: new Types.ObjectId(startEntryId),
     })
-      .sort({ weight: -1 }) // Najcięższe najpierw
-      .limit(3)              // Top 3 tylko
+      .sort({ weight: -1 })
+      .limit(MEMORY.SYNAPSE_BRANCH_FACTOR)
       .populate('to', 'analysis.summary analysis.tags rawText') // Populate target entry
       .lean();
 
@@ -62,8 +63,8 @@ export async function getSynapticTree(
       const targetId = targetEntry._id.toString();
 
       // Pobierz summary (fallback na rawText)
-      const summary = targetEntry.analysis?.summary 
-        || targetEntry.rawText?.substring(0, 80) 
+      const summary = targetEntry.analysis?.summary
+        || targetEntry.rawText?.substring(0, MEMORY.RAW_TEXT_PREVIEW_LENGTH)
         || 'Brak opisu';
 
       // Rekurencyjnie pobierz dzieci (depth - 1)
@@ -159,7 +160,7 @@ export async function getBrainContext(
       ],
     })
       .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
-      .limit(3) // Top 3 najbardziej relevantne
+      .limit(MEMORY.CONTEXT_TOP_ENTRIES)
       .lean();
 
     console.log('[ContextService] Found entries:', entries.length);
@@ -182,7 +183,7 @@ export async function getBrainContext(
       synapticTreeFormatted += `📍 START: "${summary}"\n`;
 
       // Buduj drzewo (depth = 3)
-      const tree = await getSynapticTree(entryId, 3);
+      const tree = await getSynapticTree(entryId, MEMORY.SYNAPSE_TREE_DEPTH);
       
       if (tree.length > 0) {
         synapticTreeFormatted += formatSynapticTree(tree);
