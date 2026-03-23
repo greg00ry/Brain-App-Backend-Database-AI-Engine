@@ -3,8 +3,8 @@ import { SynapseLink, processSynapseLinks } from "../synapses/synapse.service.js
 import { ILLMAdapter, cleanAndParseJSON } from "../ai/ai.service.js";
 import { IStorageAdapter, CategoryInfo } from "../db/storage.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
-import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/longTermMemorySummaryPrompt.js";
-import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyzeWithSynapsesPrompt.js";
+import { LONG_TERM_MEMORY_SUMMARY_PROMPT } from "../ai/prompts/ltm-summary.prompt.js";
+import { ANALYZE_WITH_SYNAPSES_PROMPT } from "../ai/prompts/analyze-with-synapses.prompt.js";
 import { BRAIN, LLM } from "../../config/constants.js";
 
 

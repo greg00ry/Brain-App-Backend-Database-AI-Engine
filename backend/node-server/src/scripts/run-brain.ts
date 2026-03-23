@@ -1,6 +1,6 @@
 // run-brain.ts
 import { connectDB } from "../config/db.js";
-import { runNightlyRoutine } from "../jobs/nightlyRoutine.job.js";
+import { runNightlyRoutine } from "../jobs/nightly-routine.job.js";
 import dotenv from "dotenv";
 
 dotenv.config();

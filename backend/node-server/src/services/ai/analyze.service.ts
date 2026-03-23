@@ -1,5 +1,5 @@
 import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
-import { ANALYZE_PROMPT } from "./prompts/analyzePrompt.js";
+import { ANALYZE_PROMPT } from "./prompts/analyze.prompt.js";
 import { LLM } from "../../config/constants.js";
 
 export interface AIAnalysis {

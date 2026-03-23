@@ -5,8 +5,8 @@
   "scripts": {
     "brain:now": "tsx src/scripts/run-brain.ts",
     "build": "tsc",
-    "seed:categories": "tsx src/scripts/seedCategories.ts",
-    "seed:test": "tsx src/scripts/seedTest.ts"
+    "seed:categories": "tsx src/scripts/seed-categories.ts",
+    "seed:test": "tsx src/scripts/seed-test.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
