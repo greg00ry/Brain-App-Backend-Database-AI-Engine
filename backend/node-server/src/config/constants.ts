@@ -7,7 +7,7 @@
 export const LLM = {
   API_URL: process.env.LLM_API_URL ?? "http://localhost:1234/v1/chat/completions",
   MODEL: process.env.LLM_MODEL ?? "local-model",
-  TIMEOUT: Number(process.env.LLM_TIMEOUT ?? 30_000),
+  TIMEOUT: Number(process.env.LLM_TIMEOUT ?? 120_000),
 
   // Intent classification
   INTENT_TEMPERATURE: 0.2,

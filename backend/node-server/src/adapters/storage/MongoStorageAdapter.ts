@@ -51,7 +51,8 @@ export class MongoStorageAdapter implements IStorageAdapter {
   }
 
   async getUniqueUserIds(): Promise<string[]> {
-    return VaultEntry.distinct('userId');
+    const ids = await VaultEntry.distinct('userId');
+    return ids.map((id: unknown) => String(id));
   }
 
   // ─── Intent Context ───────────────────────────────────────────────────────
