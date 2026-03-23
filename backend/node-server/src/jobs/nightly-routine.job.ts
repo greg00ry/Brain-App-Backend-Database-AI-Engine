@@ -1,23 +1,19 @@
-import { brain } from "../core/brain.instance.js";
+import { Brain } from "../core/Brain.js";
 
-/**
- * Główny punkt wejścia dla nocnego cyklu "The Brain".
- * Łączy fazę czyszczenia (Podświadomość) z fazą analizy AI (Świadomość).
- */
-export const runNightlyRoutine = async () => {
-    const startTime = Date.now();
-    console.log('\n🌙 [Nocna Rutyna] Rozpoczynam pełny cykl przetwarzania...');
+export const runNightlyRoutine = async (brain: Brain): Promise<void> => {
+  const startTime = Date.now();
+  console.log('\n🌙 [Nocna Rutyna] Rozpoczynam pełny cykl przetwarzania...');
 
-    try {
-        const { subStats, consciousStats } = await brain.runMaintenance();
+  try {
+    const { subStats, consciousStats } = await brain.runMaintenance();
 
-        console.log(`✅ Podświadomość zakończona: -${subStats.pruned} usuniętych, -${subStats.decayed} osłabionych.`);
-        console.log(`✅ Świadomość zakończona: +${consciousStats.synapsesCreated} nowych synaps.`);
+    console.log(`✅ Podświadomość: -${subStats.pruned} usuniętych, -${subStats.decayed} osłabionych.`);
+    console.log(`✅ Świadomość: +${consciousStats.synapsesCreated} nowych synaps, ${consciousStats.consolidated} skonsolidowanych.`);
 
-        const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
-        console.log(`\n🏆 [Nocna Rutyna] Cykl zakończony sukcesem w ${totalDuration}s.`);
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`\n🏆 [Nocna Rutyna] Zakończono w ${totalDuration}s.`);
 
-    } catch (error) {
-        console.error('🚨 [Nocna Rutyna] KRYTYCZNY BŁĄD CYKLU:', error);
-    }
-}
+  } catch (error) {
+    console.error('🚨 [Nocna Rutyna] BŁĄD:', error);
+  }
+};
