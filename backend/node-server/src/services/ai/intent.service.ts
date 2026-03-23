@@ -1,8 +1,9 @@
 import { IntentAction, IntentResult } from "./intent.types.js";
 import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
 import { getBrainContext } from "./intent.context.service.js";
+import { matchRules } from "./rule-engine.js";
 import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
-import { LLM, CHAT, MEMORY } from "../../config/constants.js";
+import { LLM, CHAT, MEMORY, ROUTING } from "../../config/constants.js";
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -31,7 +32,7 @@ function buildPrompt(
     });
   }
 
-  const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie danych.\n'
+  const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie.\n'
     ? `\nMEMORY:\n${brainContext.substring(0, MEMORY.BRAIN_CONTEXT_MAX_CHARS)}\n`
     : '';
 
@@ -39,39 +40,25 @@ function buildPrompt(
 You are a deterministic routing engine for a Cognitive Agent.
 Return ONLY JSON. No conversation, no explanations.
 
-### PRIORITY RULES
-1. IF input asks about AI, past notes, projects, or memory -> "action": "RESEARCH_BRAIN".
-2. DEFAULT -> "action": "SAVE_ONLY".
+### ACTIONS
+- "RESEARCH_BRAIN": user asks about past notes, memory, projects, knowledge
+- "SAVE_ONLY": user states a fact, shares info, or stores something
 
 ### JSON STRUCTURE
 {
   "action": "RESEARCH_BRAIN" | "SAVE_ONLY",
-  "reasoning": "short explanation",
-  "answer": "Short response in Polish, mordo"
+  "confidence": <integer 0-100>,
+  "reasoning": "one short sentence",
+  "answer": "Short response in Polish, must include 'mordo'"
 }
 
-### CRITICAL
-- DO NOT default to SAVE_ONLY if keywords like 'AI', 'notatki', or 'pamięć' are present.
-- Polish response must ALWAYS include the word 'mordo'.${history}${context}
+### CONFIDENCE GUIDE
+- 90-100: very clear intent
+- 75-89: likely correct
+- 50-74: uncertain
+- 0-49: just guessing${history}${context}
 
 USER: ${userText}`;
-}
-
-// ─── Keyword Fallback ─────────────────────────────────────────────────────────
-
-function keywordFallback(text: string): IntentResult | null {
-  const lower = text.toLowerCase();
-
-  const brainKeywords = ['notatki', 'mówiłeś', 'pamięć', 'projekt', 'wspominałeś', 'wiedza'];
-  if (brainKeywords.some(key => lower.includes(key))) {
-    return {
-      action: "RESEARCH_BRAIN",
-      reasoning: "Keyword match",
-      answer: "Już szperam w mojej pamięci, mordo.",
-    };
-  }
-
-  return null;
 }
 
 // ─── JSON Parser ──────────────────────────────────────────────────────────────
@@ -83,17 +70,22 @@ function parseIntentJSON(raw: string): IntentResult | null {
   if (!parsed) return null;
 
   const action = parsed["action"];
-  const reasoning = parsed["reasoning"] || "no reason";
-  const answer = parsed["answer"] || "Okej, mordo.";
+  if (typeof action !== "string" || !VALID_ACTIONS.has(action as IntentAction)) return null;
 
-  if (typeof action === "string" && VALID_ACTIONS.has(action as IntentAction)) {
-    return { action: action as IntentAction, reasoning, answer };
-  }
+  const confidence = typeof parsed["confidence"] === "number"
+    ? Math.min(100, Math.max(0, parsed["confidence"]))
+    : 50;
 
-  return null;
+  return {
+    action: action as IntentAction,
+    reasoning: parsed["reasoning"] || "no reason",
+    answer: parsed["answer"] || "Okej, mordo.",
+    confidence,
+    source: "llm",
+  };
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Hybrid Routing ───────────────────────────────────────────────────────────
 
 export async function classifyIntent(
   params: ClassifyIntentParams,
@@ -102,9 +94,21 @@ export async function classifyIntent(
 ): Promise<IntentResult> {
   const { userText, userId, chatHistory = [] } = params;
 
-  const quickResult = keywordFallback(userText);
-  if (quickResult !== null) return quickResult;
+  // Step 1: Rule engine — high confidence rules skip LLM entirely
+  const ruleMatch = matchRules(userText);
+  if (ruleMatch && ruleMatch.confidence >= ROUTING.RULE_HIGH_CONFIDENCE) {
+    return {
+      action: ruleMatch.action,
+      reasoning: ruleMatch.reasoning,
+      answer: ruleMatch.action === "RESEARCH_BRAIN"
+        ? "Już szperam w mojej pamięci, mordo."
+        : "Zapisuję, mordo.",
+      confidence: ruleMatch.confidence,
+      source: "rule",
+    };
+  }
 
+  // Step 2: LLM classification
   try {
     const { synapticTree } = await getBrainContext(userId, userText, storage);
     const prompt = buildPrompt(userText, synapticTree, chatHistory);
@@ -116,10 +120,38 @@ export async function classifyIntent(
     });
 
     const llmResult = rawContent ? parseIntentJSON(rawContent) : null;
+
+    // Step 3: LLM confidence high enough — trust it
+    if (llmResult && llmResult.confidence >= ROUTING.LLM_MIN_CONFIDENCE) {
+      return llmResult;
+    }
+
+    // Step 4: LLM uncertain — prefer rule match over low-confidence LLM
+    if (ruleMatch) {
+      return {
+        action: ruleMatch.action,
+        reasoning: `Rule fallback (LLM confidence: ${llmResult?.confidence ?? 0}): ${ruleMatch.reasoning}`,
+        answer: ruleMatch.action === "RESEARCH_BRAIN"
+          ? "Już szperam w mojej pamięci, mordo."
+          : "Zapisuję, mordo.",
+        confidence: ruleMatch.confidence,
+        source: "rule",
+      };
+    }
+
+    // Step 5: Take LLM result even if confidence is low
     if (llmResult) return llmResult;
+
   } catch (err) {
     console.error(`[IntentService] Error:`, err instanceof Error ? err.message : String(err));
   }
 
-  return { action: "SAVE_ONLY", reasoning: "Fallback", answer: "Okej mordo." };
+  // Step 6: Default fallback
+  return {
+    action: "SAVE_ONLY",
+    reasoning: "Fallback",
+    answer: "Okej, mordo.",
+    confidence: 0,
+    source: "fallback",
+  };
 }

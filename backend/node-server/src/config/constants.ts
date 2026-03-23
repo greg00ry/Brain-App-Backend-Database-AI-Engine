@@ -63,6 +63,13 @@ export const MEMORY = {
   BRAIN_CONTEXT_MAX_CHARS: 400,
 } as const;
 
+// ─── Routing ──────────────────────────────────────────────────────────────────
+
+export const ROUTING = {
+  RULE_HIGH_CONFIDENCE: 90,  // rules above this skip LLM entirely
+  LLM_MIN_CONFIDENCE: 75,    // LLM results below this trigger rule fallback
+} as const;
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export const CHAT = {

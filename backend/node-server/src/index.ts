@@ -19,7 +19,7 @@ export { MongoStorageAdapter } from "./adapters/storage/MongoStorageAdapter.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type { IntentAction, IntentResult } from "./services/ai/intent.types.js";
+export type { IntentAction, IntentResult, IntentSource } from "./services/ai/intent.types.js";
 export type { AIAnalysis } from "./services/ai/analyze.service.js";
 export type { ConsciousStats } from "./services/brain/conscious.processor.js";
 export type { SubconsciousStats } from "./services/brain/subconscious.routine.js";
