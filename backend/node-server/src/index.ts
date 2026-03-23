@@ -14,6 +14,7 @@ export type { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./adapter
 // ─── Adapter Implementations ──────────────────────────────────────────────────
 
 export { LocalLLMAdapter } from "./adapters/llm/LocalLLMAdapter.js";
+export { OpenAIAdapter } from "./adapters/llm/OpenAIAdapter.js";
 export { MongoStorageAdapter } from "./adapters/storage/MongoStorageAdapter.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
