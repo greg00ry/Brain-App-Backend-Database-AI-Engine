@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 const vaultEntrySchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: String,
     required: true,
+    index: true,
   },
 
   rawText: {
@@ -64,7 +64,7 @@ vaultEntrySchema.pre('findOneAndUpdate', function (next) {
 export const VaultEntry = mongoose.model<IVaultEntry>('VaultEntry', vaultEntrySchema);
 
 export interface IVaultEntry extends mongoose.Document {
-  userId: mongoose.Types.ObjectId;
+  userId: string;
   rawText: string;
   analysis?: {
     summary: string;

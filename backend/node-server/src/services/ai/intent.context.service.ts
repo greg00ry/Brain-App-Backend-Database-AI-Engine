@@ -92,7 +92,7 @@ export function formatSynapticTree(nodes: SynapseNode[], indent = ''): string {
 // ─── Get Brain Context ────────────────────────────────────────────────────────
 
 export async function getBrainContext(
-  userId: string | Types.ObjectId,
+  userId: string,
   userText: string,
   storage: IStorageAdapter
 ): Promise<{

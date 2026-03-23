@@ -147,7 +147,7 @@ export async function runConsciousProcessor(llm: ILLMAdapter, storage: IStorageA
     console.log(`👁️ [Świadomość] Przetwarzam ${userIds.length} użytkowników`);
 
     for (const userId of userIds) {
-      console.log(`\n👁️ [Świadomość] 👤 Użytkownik: ${userId.toString().substring(0, 8)}...`);
+      console.log(`\n👁️ [Świadomość] 👤 Użytkownik: ${userId.substring(0, 8)}...`);
 
       // ========================================
       // STEP 1: ANALYZE DELTA + FIND SYNAPSES

@@ -24,27 +24,27 @@ export interface IStorageAdapter {
   getEntryById(entryId: string): Promise<IVaultEntry | null>;
 
   // ─── Vault ────────────────────────────────────────────────────────────────
-  getVaultData(userId: string | mongoose.Types.ObjectId): Promise<{
+  getVaultData(userId: string): Promise<{
     entries: IVaultEntry[];
     memories: ILongTermMemory[];
     categories: ICategory[];
   }>;
-  deleteVaultEntry(entryId: string, userId: string | mongoose.Types.ObjectId): Promise<IVaultEntry | null>;
+  deleteVaultEntry(entryId: string, userId: string): Promise<IVaultEntry | null>;
 
   // ─── Shared ───────────────────────────────────────────────────────────────
   getCategories(): Promise<CategoryInfo[]>;
-  getUniqueUserIds(): Promise<mongoose.Types.ObjectId[]>;
+  getUniqueUserIds(): Promise<string[]>;
 
   // ─── Intent Context ───────────────────────────────────────────────────────
-  findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]>;
+  findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]>;
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
-  findDeltaEntries(userId: mongoose.Types.ObjectId, since: Date): Promise<IVaultEntry[]>;
-  findContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]): Promise<IVaultEntry[]>;
+  findDeltaEntries(userId: string, since: Date): Promise<IVaultEntry[]>;
+  findContextEntries(userId: string, excludeIds: string[]): Promise<IVaultEntry[]>;
   applyTopicAnalysis(topic: TopicAnalysis): Promise<number>;
-  findStrongEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]>;
+  findStrongEntries(userId: string): Promise<IVaultEntry[]>;
   upsertLTM(
-    userId: mongoose.Types.ObjectId,
+    userId: string,
     topic: string,
     category: string,
     memoryData: LongTermMemoryData,

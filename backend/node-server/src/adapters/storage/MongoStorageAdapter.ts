@@ -22,7 +22,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
 
   // ─── Vault ────────────────────────────────────────────────────────────────
 
-  async getVaultData(userId: string | mongoose.Types.ObjectId): Promise<{
+  async getVaultData(userId: string): Promise<{
     entries: IVaultEntry[];
     memories: ILongTermMemory[];
     categories: ICategory[];
@@ -35,7 +35,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
     return { entries, memories, categories };
   }
 
-  async deleteVaultEntry(entryId: string, userId: string | mongoose.Types.ObjectId): Promise<IVaultEntry | null> {
+  async deleteVaultEntry(entryId: string, userId: string): Promise<IVaultEntry | null> {
     return VaultEntry.findOneAndDelete({ _id: entryId, userId });
   }
 
@@ -50,13 +50,13 @@ export class MongoStorageAdapter implements IStorageAdapter {
     }));
   }
 
-  async getUniqueUserIds(): Promise<mongoose.Types.ObjectId[]> {
+  async getUniqueUserIds(): Promise<string[]> {
     return VaultEntry.distinct('userId');
   }
 
   // ─── Intent Context ───────────────────────────────────────────────────────
 
-  async findRelevantEntries(userId: string | mongoose.Types.ObjectId, keywords: string[]): Promise<IVaultEntry[]> {
+  async findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]> {
     const pattern = keywords.join('|');
     return VaultEntry.find({
       userId,
@@ -73,7 +73,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
 
-  async findDeltaEntries(userId: mongoose.Types.ObjectId, since: Date): Promise<IVaultEntry[]> {
+  async findDeltaEntries(userId: string, since: Date): Promise<IVaultEntry[]> {
     return VaultEntry.find({
       userId,
       $or: [
@@ -85,7 +85,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
       .limit(MEMORY.DELTA_ENTRIES_LIMIT);
   }
 
-  async findContextEntries(userId: mongoose.Types.ObjectId, excludeIds: string[]): Promise<IVaultEntry[]> {
+  async findContextEntries(userId: string, excludeIds: string[]): Promise<IVaultEntry[]> {
     return VaultEntry.find({
       userId,
       _id: { $nin: excludeIds.map(id => new mongoose.Types.ObjectId(id)) },
@@ -113,7 +113,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
     return ops.length;
   }
 
-  async findStrongEntries(userId: mongoose.Types.ObjectId): Promise<IVaultEntry[]> {
+  async findStrongEntries(userId: string): Promise<IVaultEntry[]> {
     return VaultEntry.find({
       userId,
       'analysis.strength': { $gte: BRAIN.STRENGTH_LTM_THRESHOLD },
@@ -122,7 +122,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
   }
 
   async upsertLTM(
-    userId: mongoose.Types.ObjectId,
+    userId: string,
     topic: string,
     category: string,
     memoryData: LongTermMemoryData,
