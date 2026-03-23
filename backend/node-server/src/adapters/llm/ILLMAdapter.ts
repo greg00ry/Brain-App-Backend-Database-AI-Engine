@@ -1,0 +1,19 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// LLM ADAPTER INTERFACE - Framework-agnostic LLM abstraction
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface LLMRequest {
+  systemPrompt?: string;
+  userPrompt: string;
+  temperature: number;
+  maxTokens: number;
+}
+
+/**
+ * Adapter interface for any LLM backend.
+ * Returns the raw text content from the model, or null on failure.
+ * Callers use cleanAndParseJSON() if they need structured output.
+ */
+export interface ILLMAdapter {
+  complete(request: LLMRequest): Promise<string | null>;
+}

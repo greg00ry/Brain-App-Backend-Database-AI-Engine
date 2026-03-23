@@ -1,7 +1,5 @@
-import { LongTermMemory } from "../../models/LongTermMemory.js";
-import { VaultEntry } from "../../models/VaultEntry.js";
-import { VaultRepo } from "../db/vault.repo.js";
-
+import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
+import { MISC } from "../../config/constants.js";
 
 
 // ============================================================================
@@ -17,17 +15,14 @@ export interface SubconsciousStats {
 }
 
 
-
-
-
 /**
  * Subconscious routine - runs WITHOUT AI, pure logic/math operations.
  * Handles: Decay, Pruning, and marking entries ready for consolidation.
  */
-export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
+export async function runSubconsciousRoutine(storage: IStorageAdapter): Promise<SubconsciousStats> {
   console.log('\n🌘 [Podświadomość] Uruchamiam rutynę podświadomości...');
   const startTime = Date.now();
-  
+
   const stats: SubconsciousStats = {
     decayed: 0,
     pruned: 0,
@@ -36,10 +31,8 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
   };
 
   try {
-    // Get IDs of entries already consolidated into LongTermMemory
-    const consolidatedEntryIds = await LongTermMemory.distinct('sourceEntryIds');
-    const consolidatedIdSet = new Set(consolidatedEntryIds.map(id => id.toString()));
-
+    const consolidatedIds = await storage.getConsolidatedEntryIds();
+    const consolidatedIdSet = new Set(consolidatedIds);
     console.log('🌘 [Podświadomość] Znaleziono', consolidatedIdSet.size, 'wpisów już w pamięci długotrwałej');
 
     // ========================================
@@ -47,26 +40,17 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     // Reduce strength by 1 for entries NOT in LTM and not recently active
     // ========================================
     console.log('🌘 [Podświadomość] Faza 1: DECAY (zanikanie wspomnień)...');
-    
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    // Find entries to decay: not consolidated, not recently active, strength > 0
-    const entriesToDecay = await VaultRepo.findEntriesToDecay(oneDayAgo)
+
+    const oneDayAgo = new Date(Date.now() - MISC.ONE_DAY_MS);
+    const entriesToDecay = await storage.findEntriesToDecay(oneDayAgo);
 
     if (entriesToDecay.length > 0) {
-      // Filter out entries that are in LTM
-      const decayOps = entriesToDecay
+      const idsToDecay = entriesToDecay
         .filter(e => !consolidatedIdSet.has(e._id.toString()))
-        .map(entry => ({
-          updateOne: {
-            filter: { _id: entry._id },
-            update: { $inc: { strength: -1 } },
-          },
-        }));
+        .map(e => e._id);
 
-      if (decayOps.length > 0) {
-        const result = await VaultRepo.bulkWriteDecayOps(decayOps)
-        stats.decayed = result.modifiedCount;
+      if (idsToDecay.length > 0) {
+        stats.decayed = await storage.decayEntries(idsToDecay);
         console.log(`🌘 [Podświadomość]    ↳ Osłabiono ${stats.decayed} wspomnień (strength -1)`);
       }
     }
@@ -76,32 +60,28 @@ export async function runSubconsciousRoutine(): Promise<SubconsciousStats> {
     // Delete entries with strength = 0
     // ========================================
     console.log('🌘 [Podświadomość] Faza 2: PRUNING (usuwanie zapomnianych)...');
-    
-    const pruneResult = await VaultRepo.pruneResults()
-    
-    stats.pruned  = (pruneResult.deadEntries?.deletedCount || 0) + (pruneResult.deadSynapses?.deletedCount || 0);
+
+    const prunedEntries = await storage.pruneDeadEntries();
+    const prunedSynapses = await storage.pruneDeadSynapses();
+    stats.pruned = prunedEntries + prunedSynapses;
+
     if (stats.pruned > 0) {
-  console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} elementów (wpisy + synapsy)`);
-  
-  
-}
+      console.log(`🌘 [Podświadomość]    ↳ Usunięto ${stats.pruned} elementów (wpisy + synapsy)`);
+    }
 
     // ========================================
     // PHASE 3: MARK FOR CONSOLIDATION
     // Mark entries with strength >= 10 as ready for LTM
     // ========================================
     console.log('🌘 [Podświadomość] Faza 3: Oznaczanie silnych wspomnień...');
-    
-    const strongEntries = await VaultRepo.markStrongEntries()
 
+    const strongEntries = await storage.findEntriesReadyForLTM();
     if (strongEntries.length > 0) {
       stats.readyForLTM = strongEntries.length;
       console.log(`🌘 [Podświadomość]    ↳ ${stats.readyForLTM} wspomnień gotowych do konsolidacji w LTM`);
     }
 
-    // Get total count
-    // DO POPRAWY PRZY IMPLEMENTACJI LOGOWANIA
-    stats.totalProcessed = await VaultRepo.getTotalProcessedCount()
+    stats.totalProcessed = await storage.countEntries();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`🌘 [Podświadomość] ✅ Zakończono w ${duration}s`);
