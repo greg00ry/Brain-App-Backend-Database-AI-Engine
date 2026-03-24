@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { Command } from "commander";
+import * as readline from "readline";
 import { connectDB } from "../config/db.js";
 import { Brain } from "../core/Brain.js";
 import { OpenAIAPIAdapter } from "../adapters/llm/OpenAIAPIAdapter.js";
@@ -103,6 +104,49 @@ program
     } finally {
       await teardown();
     }
+  });
+
+program
+  .command("chat", { isDefault: true })
+  .description("Interactive chat with The Brain")
+  .action(async () => {
+    await setup();
+
+    const chatHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    console.log('🧠 The Brain — type your message, Ctrl+C to exit\n');
+
+    const ask = () => {
+      rl.question('You: ', async (input) => {
+        const text = input.trim();
+        if (!text) { ask(); return; }
+
+        chatHistory.push({ role: 'user', content: text });
+
+        try {
+          const result = await brain.process(USER_ID, text, chatHistory);
+          console.log(`\nBrain: ${result.answer}\n`);
+          chatHistory.push({ role: 'assistant', content: result.answer });
+        } catch (err) {
+          console.error('Error:', err);
+        }
+
+        ask();
+      });
+    };
+
+    rl.on('close', async () => {
+      console.log('\nBye.');
+      await teardown();
+      process.exit(0);
+    });
+
+    ask();
   });
 
 program.parse();
