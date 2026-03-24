@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Synapse } from "../../models/Synapse.js";
 import { IVaultEntry } from "../../models/VaultEntry.js";
 import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
+import { IEmbeddingAdapter } from "../../adapters/embedding/IEmbeddingAdapter.js";
 import { MEMORY } from "../../config/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -94,20 +95,26 @@ export function formatSynapticTree(nodes: SynapseNode[], indent = ''): string {
 export async function getBrainContext(
   userId: string,
   userText: string,
-  storage: IStorageAdapter
+  storage: IStorageAdapter,
+  embeddingAdapter?: IEmbeddingAdapter,
 ): Promise<{
   relevantEntries: IVaultEntry[];
   synapticTree: string;
   hasContext: boolean;
 }> {
   try {
-    const keywords = extractKeywords(userText);
+    let entries: IVaultEntry[];
 
-    if (keywords.length === 0) {
-      return { relevantEntries: [], synapticTree: '💭 Brak słów kluczowych do wyszukania.\n', hasContext: false };
+    if (embeddingAdapter) {
+      const vector = await embeddingAdapter.embed(userText);
+      entries = await storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+    } else {
+      const keywords = extractKeywords(userText);
+      if (keywords.length === 0) {
+        return { relevantEntries: [], synapticTree: '💭 Brak słów kluczowych do wyszukania.\n', hasContext: false };
+      }
+      entries = await storage.findRelevantEntries(userId, keywords);
     }
-
-    const entries = await storage.findRelevantEntries(userId, keywords);
 
     if (entries.length === 0) {
       return { relevantEntries: [], synapticTree: '💭 Brak relevantnych wspomnień w bazie.\n', hasContext: false };

@@ -37,6 +37,8 @@ export interface IStorageAdapter {
 
   // ─── Intent Context ───────────────────────────────────────────────────────
   findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]>;
+  findSimilarEntries(userId: string, embedding: number[], topK?: number): Promise<IVaultEntry[]>;
+  updateEntryEmbedding(entryId: string, embedding: number[]): Promise<void>;
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
   findDeltaEntries(userId: string, since: Date): Promise<IVaultEntry[]>;

@@ -10,12 +10,14 @@ export { Brain } from "./core/Brain.js";
 
 export type { ILLMAdapter, LLMRequest } from "./adapters/llm/ILLMAdapter.js";
 export type { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./adapters/storage/IStorageAdapter.js";
+export type { IEmbeddingAdapter } from "./adapters/embedding/IEmbeddingAdapter.js";
 
 // ─── Adapter Implementations ──────────────────────────────────────────────────
 
 export { LocalLLMAdapter } from "./adapters/llm/LocalLLMAdapter.js";
 export { OpenAIAdapter } from "./adapters/llm/OpenAIAdapter.js";
 export { MongoStorageAdapter } from "./adapters/storage/MongoStorageAdapter.js";
+export { OllamaEmbeddingAdapter } from "./adapters/embedding/OllamaEmbeddingAdapter.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -72,6 +72,29 @@ export class MongoStorageAdapter implements IStorageAdapter {
       .lean() as unknown as IVaultEntry[];
   }
 
+  async findSimilarEntries(userId: string, embedding: number[], topK = 3): Promise<IVaultEntry[]> {
+    const candidates = await VaultEntry.find({
+      userId,
+      embedding: { $exists: true, $ne: [] },
+    })
+      .select('_id rawText analysis embedding')
+      .lean() as unknown as (IVaultEntry & { embedding: number[] })[];
+
+    if (candidates.length === 0) return [];
+
+    const scored = candidates.map(entry => ({
+      entry,
+      score: cosineSimilarity(embedding, entry.embedding),
+    }));
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, topK).map(s => s.entry);
+  }
+
+  async updateEntryEmbedding(entryId: string, embedding: number[]): Promise<void> {
+    await VaultEntry.updateOne({ _id: entryId }, { $set: { embedding } });
+  }
+
   // ─── Conscious Processor ──────────────────────────────────────────────────
 
   async findDeltaEntries(userId: string, since: Date): Promise<IVaultEntry[]> {
@@ -209,4 +232,15 @@ export class MongoStorageAdapter implements IStorageAdapter {
   async countEntries(): Promise<number> {
     return VaultEntry.countDocuments();
   }
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
