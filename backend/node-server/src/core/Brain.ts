@@ -7,6 +7,8 @@ import { proccessAndStore } from "../services/ingest/ingest.service.js";
 import { runSubconsciousRoutine } from "../services/brain/subconscious.routine.js";
 import { runConsciousProcessor } from "../services/brain/conscious.processor.js";
 import { RESEARCH_ANSWER_PROMPT } from "../services/ai/prompts/research-answer.prompt.js";
+import { SAVE_RESPONSE_PROMPT } from "../services/ai/prompts/save-response.prompt.js";
+import { PERSONALITY_SYSTEM_PROMPT } from "../services/ai/prompts/personality.prompt.js";
 import { LLM } from "../config/constants.js";
 
 export type ActionHandler = (
@@ -38,18 +40,29 @@ export class Brain {
     private readonly storage: IStorageAdapter,
     private readonly embedding?: IEmbeddingAdapter,
   ) {
-    this.handlers.set("RESEARCH_BRAIN", async (userId, text, { synapticTree, hasContext }) => {
-      if (!hasContext) return "Nie znalazłem nic w pamięci na ten temat.";
-      const prompt = RESEARCH_ANSWER_PROMPT(text, synapticTree);
+    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }) => {
+      const prompt = hasContext
+        ? RESEARCH_ANSWER_PROMPT(text, synapticTree)
+        : `The user asked: "${text}"\n\nYou don't have anything stored about this yet. Let them know and ask if they want to tell you more.`;
+
       const answer = await this.llm.complete({
+        systemPrompt: PERSONALITY_SYSTEM_PROMPT,
         userPrompt: prompt,
         temperature: LLM.INTENT_TEMPERATURE,
         maxTokens: LLM.INTENT_MAX_TOKENS,
       });
-      return answer ?? "Znalazłem wspomnienia, ale nie udało mi się wygenerować odpowiedzi.";
+      return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
 
-    this.handlers.set("SAVE_ONLY", async () => "Zapisano.");
+    this.handlers.set("SAVE_ONLY", async (_userId, text) => {
+      const answer = await this.llm.complete({
+        systemPrompt: PERSONALITY_SYSTEM_PROMPT,
+        userPrompt: SAVE_RESPONSE_PROMPT(text),
+        temperature: 0.8,
+        maxTokens: 150,
+      });
+      return answer ?? "Zapisałem to.";
+    });
   }
 
   // ─── Actions ──────────────────────────────────────────────────────────────
@@ -83,8 +96,11 @@ export class Brain {
     }
 
     if (intent.action === "SAVE_ONLY") {
-      const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
-      return { action: "SAVE_ONLY", answer: "Zapisano.", entryId: entry._id };
+      const [entry, answer] = await Promise.all([
+        proccessAndStore(userId, text, this.llm, this.storage, this.embedding),
+        handler(userId, text, context, this.llm),
+      ]);
+      return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
     const answer = await handler(userId, text, context, this.llm);

@@ -1,22 +1,12 @@
 export const RESEARCH_ANSWER_PROMPT = (
   userText: string,
   context: string,
-  chatHistory?: { role: string; content: string }[]
 ): string => {
-  let history = '';
-  if (chatHistory && chatHistory.length > 0) {
-    history = '\nCONVERSATION HISTORY:\n';
-    chatHistory.slice(-3).forEach(msg => {
-      history += `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.content}\n`;
-    });
-  }
+  return `Answer the user's question based on their personal memory vault below.
+If the context is relevant, use it. If not, say you don't have that info yet and ask if they want to tell you about it.
 
-  return `You are a helpful assistant with access to the user's personal memory vault.
-Answer the user's question based on the memory context below.
-Be concise and direct. If the context doesn't contain relevant information, say so.
-${history}
 MEMORY CONTEXT:
 ${context}
 
-USER QUESTION: ${userText}`;
+USER: ${userText}`;
 };
