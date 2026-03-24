@@ -1,4 +1,5 @@
-import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
+import { ILLMAdapter } from "../../adapters/llm/ILLMAdapter.js";
+import { cleanAndParseJSON } from "../../utils/json.js";
 import { ANALYZE_PROMPT } from "./prompts/analyze.prompt.js";
 import { LLM } from "../../config/constants.js";
 

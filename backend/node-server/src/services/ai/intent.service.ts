@@ -1,5 +1,6 @@
 import { IntentAction, IntentResult } from "./intent.types.js";
-import { ILLMAdapter, cleanAndParseJSON } from "./ai.service.js";
+import { ILLMAdapter } from "../../adapters/llm/ILLMAdapter.js";
+import { cleanAndParseJSON } from "../../utils/json.js";
 import { getBrainContext } from "./intent.context.service.js";
 import { matchRules } from "./rule-engine.js";
 import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";

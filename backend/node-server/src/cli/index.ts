@@ -4,11 +4,29 @@ dotenv.config();
 
 import { Command } from "commander";
 import { connectDB } from "../config/db.js";
-import { brain } from "../core/brain.instance.js";
+import { Brain } from "../core/Brain.js";
+import { OpenAIAPIAdapter } from "../adapters/llm/OpenAIAPIAdapter.js";
+import { OpenAIAPIEmbeddingAdapter } from "../adapters/embedding/OpenAIAPIEmbeddingAdapter.js";
+import { MongoStorageAdapter } from "../adapters/storage/MongoStorageAdapter.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const USER_ID = process.env.BRAIN_USER_ID ?? "default";
+
+const LLM_URL = process.env.LLM_API_URL ?? "http://localhost:1234/v1/chat/completions";
+const LLM_MODEL = process.env.LLM_MODEL ?? "local-model";
+const LLM_API_KEY = process.env.LLM_API_KEY ?? "local";
+
+const EMBEDDING_URL = process.env.EMBEDDING_API_URL ?? "http://localhost:11434/v1/embeddings";
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL ?? "nomic-embed-text";
+
+// ─── Brain ────────────────────────────────────────────────────────────────────
+
+const brain = new Brain(
+  new OpenAIAPIAdapter(LLM_URL, LLM_MODEL, LLM_API_KEY),
+  new MongoStorageAdapter(),
+  new OpenAIAPIEmbeddingAdapter(EMBEDDING_URL, EMBEDDING_MODEL),
+);
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +48,6 @@ program
   .description("The Brain — local-first cognitive memory framework")
   .version("0.1.0");
 
-// brain process "text"
 program
   .command("process <text>")
   .description("Classify intent, save to vault, and respond")
@@ -44,7 +61,6 @@ program
     }
   });
 
-// brain save "text"
 program
   .command("save <text>")
   .description("Save text directly to vault")
@@ -58,7 +74,6 @@ program
     }
   });
 
-// brain recall "text"
 program
   .command("recall <text>")
   .description("Search memory and return synaptic context")
@@ -76,7 +91,6 @@ program
     }
   });
 
-// brain maintenance
 program
   .command("maintenance")
   .description("Run nightly maintenance (decay, pruning, consolidation)")

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "brain": "tsx src/cli/index.ts",
-    "brain:now": "tsx src/scripts/run-brain.ts",
+    "brain:now": "tsx test-app/run-brain.ts",
     "build": "tsc",
     "seed:categories": "tsx src/scripts/seed-categories.ts",
     "seed:test": "tsx src/scripts/seed-test.ts"

@@ -32,6 +32,9 @@ coverage/
 tmp/
 temp/
 
+# Test app (framework usage example, not part of framework)
+backend/node-server/test-app/
+
 # Frontend specific
 *.local
 .eslintcache
