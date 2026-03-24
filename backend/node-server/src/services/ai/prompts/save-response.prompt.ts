@@ -1,4 +1,4 @@
 export const SAVE_RESPONSE_PROMPT = (text: string): string =>
-  `The user just shared this with you: "${text}"
+  `Ktoś właśnie Ci powiedział: "${text}"
 
-Acknowledge what they said briefly, then ask ONE curious follow-up question to learn more about it.`;
+Odpowiedz bezpośrednio do tej osoby. Potwierdź krótko i zadaj JEDNO konkretne pytanie żeby dowiedzieć się więcej. Nie pisz "Zapisano". Używaj "ty/Ty" nie "użytkownik".`;
