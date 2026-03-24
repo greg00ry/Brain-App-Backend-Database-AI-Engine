@@ -6,6 +6,14 @@ import { getBrainContext } from "../services/ai/intent.context.service.js";
 import { proccessAndStore } from "../services/ingest/ingest.service.js";
 import { runSubconsciousRoutine } from "../services/brain/subconscious.routine.js";
 import { runConsciousProcessor } from "../services/brain/conscious.processor.js";
+import { RESEARCH_ANSWER_PROMPT } from "../services/ai/prompts/research-answer.prompt.js";
+import { LLM } from "../config/constants.js";
+
+export interface ProcessResult {
+  action: string;
+  answer: string;
+  entryId?: unknown;
+}
 
 export class Brain {
   constructor(
@@ -14,12 +22,32 @@ export class Brain {
     private readonly embedding?: IEmbeddingAdapter,
   ) {}
 
-  async process(userId: string, text: string, chatHistory?: ChatMessage[]) {
-    const [intentResult, entry] = await Promise.all([
-      classifyIntent({ userText: text, userId, chatHistory }, this.llm, this.storage),
-      proccessAndStore(userId, text, this.llm, this.storage, this.embedding),
-    ]);
-    return { action: intentResult.action, answer: intentResult.answer, entryId: entry._id };
+  async process(userId: string, text: string, chatHistory?: ChatMessage[]): Promise<ProcessResult> {
+    const intent = await classifyIntent({ userText: text, chatHistory }, this.llm);
+
+    if (intent.action === "RESEARCH_BRAIN") {
+      const { synapticTree, hasContext } = await getBrainContext(userId, text, this.storage, this.embedding);
+
+      if (!hasContext) {
+        return { action: "RESEARCH_BRAIN", answer: "Nie znalazłem nic w pamięci na ten temat." };
+      }
+
+      const prompt = RESEARCH_ANSWER_PROMPT(text, synapticTree, chatHistory);
+      const answer = await this.llm.complete({
+        userPrompt: prompt,
+        temperature: LLM.INTENT_TEMPERATURE,
+        maxTokens: LLM.INTENT_MAX_TOKENS,
+      });
+
+      return {
+        action: "RESEARCH_BRAIN",
+        answer: answer ?? "Znalazłem wspomnienia, ale nie udało mi się wygenerować odpowiedzi.",
+      };
+    }
+
+    // SAVE_ONLY
+    const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
+    return { action: "SAVE_ONLY", answer: "Zapisano.", entryId: entry._id };
   }
 
   async recall(userId: string, text: string) {

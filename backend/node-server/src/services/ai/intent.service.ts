@@ -1,10 +1,8 @@
 import { IntentAction, IntentResult } from "./intent.types.js";
 import { ILLMAdapter } from "../../adapters/llm/ILLMAdapter.js";
 import { cleanAndParseJSON } from "../../utils/json.js";
-import { getBrainContext } from "./intent.context.service.js";
 import { matchRules } from "./rule-engine.js";
-import { IStorageAdapter } from "../../adapters/storage/IStorageAdapter.js";
-import { LLM, CHAT, MEMORY, ROUTING } from "../../config/constants.js";
+import { LLM, ROUTING } from "../../config/constants.js";
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -13,51 +11,33 @@ export interface ChatMessage {
 
 export interface ClassifyIntentParams {
   userText: string;
-  userId: string;
   chatHistory?: ChatMessage[];
 }
 
 // ─── Prompt ───────────────────────────────────────────────────────────────────
 
-function buildPrompt(
-  userText: string,
-  brainContext: string,
-  chatHistory?: ChatMessage[]
-): string {
+function buildPrompt(userText: string, chatHistory?: ChatMessage[]): string {
   let history = '';
   if (chatHistory && chatHistory.length > 0) {
-    const recent = chatHistory.slice(-CHAT.HISTORY_RECENT_FOR_PROMPT);
     history = '\nCONVERSATION:\n';
-    recent.forEach(msg => {
+    chatHistory.slice(-3).forEach(msg => {
       history += `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.content}\n`;
     });
   }
 
-  const context = brainContext !== '💭 Brak relevantnych wspomnień w bazie.\n'
-    ? `\nMEMORY:\n${brainContext.substring(0, MEMORY.BRAIN_CONTEXT_MAX_CHARS)}\n`
-    : '';
-
   return `### ROLE
-You are a deterministic routing engine for a Cognitive Agent.
-Return ONLY JSON. No conversation, no explanations.
+You are a deterministic routing engine. Return ONLY JSON.
 
 ### ACTIONS
-- "RESEARCH_BRAIN": user asks about past notes, memory, projects, knowledge
-- "SAVE_ONLY": user states a fact, shares info, or stores something
+- "RESEARCH_BRAIN": user asks a question about past notes, memory, or stored knowledge
+- "SAVE_ONLY": user states a fact, shares info, or wants to store something
 
 ### JSON STRUCTURE
 {
   "action": "RESEARCH_BRAIN" | "SAVE_ONLY",
   "confidence": <integer 0-100>,
-  "reasoning": "one short sentence",
-  "answer": "Short response in Polish, must include 'mordo'"
-}
-
-### CONFIDENCE GUIDE
-- 90-100: very clear intent
-- 75-89: likely correct
-- 50-74: uncertain
-- 0-49: just guessing${history}${context}
+  "reasoning": "one short sentence"
+}${history}
 
 USER: ${userText}`;
 }
@@ -80,7 +60,6 @@ function parseIntentJSON(raw: string): IntentResult | null {
   return {
     action: action as IntentAction,
     reasoning: parsed["reasoning"] || "no reason",
-    answer: parsed["answer"] || "Okej, mordo.",
     confidence,
     source: "llm",
   };
@@ -91,9 +70,8 @@ function parseIntentJSON(raw: string): IntentResult | null {
 export async function classifyIntent(
   params: ClassifyIntentParams,
   llm: ILLMAdapter,
-  storage: IStorageAdapter
 ): Promise<IntentResult> {
-  const { userText, userId, chatHistory = [] } = params;
+  const { userText, chatHistory = [] } = params;
 
   // Step 1: Rule engine — high confidence rules skip LLM entirely
   const ruleMatch = matchRules(userText);
@@ -101,9 +79,6 @@ export async function classifyIntent(
     return {
       action: ruleMatch.action,
       reasoning: ruleMatch.reasoning,
-      answer: ruleMatch.action === "RESEARCH_BRAIN"
-        ? "Już szperam w mojej pamięci, mordo."
-        : "Zapisuję, mordo.",
       confidence: ruleMatch.confidence,
       source: "rule",
     };
@@ -111,8 +86,7 @@ export async function classifyIntent(
 
   // Step 2: LLM classification
   try {
-    const { synapticTree } = await getBrainContext(userId, userText, storage);
-    const prompt = buildPrompt(userText, synapticTree, chatHistory);
+    const prompt = buildPrompt(userText, chatHistory);
 
     const rawContent = await llm.complete({
       userPrompt: prompt,
@@ -127,20 +101,17 @@ export async function classifyIntent(
       return llmResult;
     }
 
-    // Step 4: LLM uncertain — prefer rule match over low-confidence LLM
+    // Step 4: LLM uncertain — prefer rule match
     if (ruleMatch) {
       return {
         action: ruleMatch.action,
         reasoning: `Rule fallback (LLM confidence: ${llmResult?.confidence ?? 0}): ${ruleMatch.reasoning}`,
-        answer: ruleMatch.action === "RESEARCH_BRAIN"
-          ? "Już szperam w mojej pamięci, mordo."
-          : "Zapisuję, mordo.",
         confidence: ruleMatch.confidence,
         source: "rule",
       };
     }
 
-    // Step 5: Take LLM result even if confidence is low
+    // Step 5: Take LLM result even if low confidence
     if (llmResult) return llmResult;
 
   } catch (err) {
@@ -151,7 +122,6 @@ export async function classifyIntent(
   return {
     action: "SAVE_ONLY",
     reasoning: "Fallback",
-    answer: "Okej, mordo.",
     confidence: 0,
     source: "fallback",
   };
