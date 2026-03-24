@@ -96,10 +96,9 @@ export class Brain {
     }
 
     if (intent.action === "SAVE_ONLY") {
-      const [entry, answer] = await Promise.all([
-        proccessAndStore(userId, text, this.llm, this.storage, this.embedding),
-        handler(userId, text, context, this.llm),
-      ]);
+      // Sequential: save first (uses LLM for analysis), then personality response
+      const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
+      const answer = await handler(userId, text, context, this.llm);
       return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
