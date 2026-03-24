@@ -1,4 +1,4 @@
-import { LocalLLMAdapter } from "../../adapters/llm/LocalLLMAdapter.js";
+import { OpenAIAPIAdapter } from "../../adapters/llm/OpenAIAPIAdapter.js";
 
 export { type ILLMAdapter, type LLMRequest } from "../../adapters/llm/ILLMAdapter.js";
 
@@ -6,7 +6,7 @@ export { type ILLMAdapter, type LLMRequest } from "../../adapters/llm/ILLMAdapte
 // LLM ADAPTER SINGLETON
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const llmAdapter = new LocalLLMAdapter();
+export const llmAdapter = new OpenAIAPIAdapter();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // JSON UTILS

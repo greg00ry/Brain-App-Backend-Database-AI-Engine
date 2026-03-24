@@ -14,10 +14,9 @@ export type { IEmbeddingAdapter } from "./adapters/embedding/IEmbeddingAdapter.j
 
 // ─── Adapter Implementations ──────────────────────────────────────────────────
 
-export { LocalLLMAdapter } from "./adapters/llm/LocalLLMAdapter.js";
-export { OpenAIAdapter } from "./adapters/llm/OpenAIAdapter.js";
+export { OpenAIAPIAdapter } from "./adapters/llm/OpenAIAPIAdapter.js";
 export { MongoStorageAdapter } from "./adapters/storage/MongoStorageAdapter.js";
-export { OllamaEmbeddingAdapter } from "./adapters/embedding/OllamaEmbeddingAdapter.js";
+export { OpenAIAPIEmbeddingAdapter } from "./adapters/embedding/OpenAIAPIEmbeddingAdapter.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
