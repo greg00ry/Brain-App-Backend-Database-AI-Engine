@@ -33,6 +33,7 @@ const brain = new Brain(
 
 async function setup() {
   await connectDB();
+  await brain.loadActions();
 }
 
 async function teardown() {

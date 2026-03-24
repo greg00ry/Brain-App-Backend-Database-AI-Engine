@@ -20,7 +20,7 @@ export { OpenAIAPIEmbeddingAdapter } from "./adapters/embedding/OpenAIAPIEmbeddi
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type { IntentAction, IntentResult, IntentSource } from "./services/ai/intent.types.js";
+export type { IntentResult, IntentSource } from "./services/ai/intent.types.js";
 export type { AIAnalysis } from "./services/ai/analyze.service.js";
 export type { ConsciousStats } from "./services/brain/conscious.processor.js";
 export type { SubconsciousStats } from "./services/brain/subconscious.routine.js";

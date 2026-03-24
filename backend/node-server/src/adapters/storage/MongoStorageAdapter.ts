@@ -3,8 +3,9 @@ import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js";
 import { Category, ICategory } from "../../models/Category.js";
 import { LongTermMemory, ILongTermMemory } from "../../models/LongTermMemory.js";
 import { Synapse } from "../../models/Synapse.js";
+import { Action } from "../../models/Action.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
-import { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./IStorageAdapter.js";
+import { IStorageAdapter, CategoryInfo, EntryAnalysisData, ActionInfo } from "./IStorageAdapter.js";
 import { BRAIN, MEMORY } from "../../config/constants.js";
 
 export class MongoStorageAdapter implements IStorageAdapter {
@@ -53,6 +54,19 @@ export class MongoStorageAdapter implements IStorageAdapter {
   async getUniqueUserIds(): Promise<string[]> {
     const ids = await VaultEntry.distinct('userId');
     return ids.map((id: unknown) => String(id));
+  }
+
+  async getActions(): Promise<ActionInfo[]> {
+    const actions = await Action.find({ isActive: true });
+    return actions.map(a => ({ name: a.name, description: a.description }));
+  }
+
+  async upsertAction(name: string, description: string, isBuiltIn = false): Promise<void> {
+    await Action.findOneAndUpdate(
+      { name },
+      { name, description, isBuiltIn, isActive: true },
+      { upsert: true }
+    );
   }
 
   // ─── Intent Context ───────────────────────────────────────────────────────
