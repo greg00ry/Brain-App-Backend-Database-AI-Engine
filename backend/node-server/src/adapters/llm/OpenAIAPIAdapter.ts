@@ -1,17 +1,13 @@
 import { ILLMAdapter, LLMRequest } from "./ILLMAdapter.js";
+import { LLM } from "../../config/constants.js";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// OPENAI ADAPTER - OpenAI API (gpt-4o, gpt-4-turbo, etc.)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_TIMEOUT_MS = 30_000;
-
-export class OpenAIAdapter implements ILLMAdapter {
+// Works with any OpenAI-compatible API: LM Studio, Ollama, OpenAI, etc.
+export class OpenAIAPIAdapter implements ILLMAdapter {
   constructor(
-    private readonly apiKey: string,
-    private readonly model: string = "gpt-4o",
-    private readonly timeout: number = DEFAULT_TIMEOUT_MS,
+    private readonly url: string = LLM.API_URL,
+    private readonly model: string = LLM.MODEL,
+    private readonly apiKey: string = "local",
+    private readonly timeout: number = LLM.TIMEOUT,
   ) {}
 
   async complete(request: LLMRequest): Promise<string | null> {
@@ -26,7 +22,7 @@ export class OpenAIAdapter implements ILLMAdapter {
         { role: "user", content: request.userPrompt },
       ];
 
-      const response = await fetch(OPENAI_API_URL, {
+      const response = await fetch(this.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

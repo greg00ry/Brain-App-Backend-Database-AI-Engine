@@ -1,4 +1,3 @@
-import { IntentAction } from "./intent.types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RULE ENGINE - Deterministic intent matching (Polish + English)
@@ -6,14 +5,14 @@ import { IntentAction } from "./intent.types.js";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface RuleMatch {
-  action: IntentAction;
+  action: string;
   confidence: number;
   reasoning: string;
 }
 
 interface Rule {
   patterns: RegExp[];
-  action: IntentAction;
+  action: string;
   confidence: number;
   reasoning: string;
 }

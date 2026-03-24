@@ -10,16 +10,17 @@ export { Brain } from "./core/Brain.js";
 
 export type { ILLMAdapter, LLMRequest } from "./adapters/llm/ILLMAdapter.js";
 export type { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./adapters/storage/IStorageAdapter.js";
+export type { IEmbeddingAdapter } from "./adapters/embedding/IEmbeddingAdapter.js";
 
 // ─── Adapter Implementations ──────────────────────────────────────────────────
 
-export { LocalLLMAdapter } from "./adapters/llm/LocalLLMAdapter.js";
-export { OpenAIAdapter } from "./adapters/llm/OpenAIAdapter.js";
+export { OpenAIAPIAdapter } from "./adapters/llm/OpenAIAPIAdapter.js";
 export { MongoStorageAdapter } from "./adapters/storage/MongoStorageAdapter.js";
+export { OpenAIAPIEmbeddingAdapter } from "./adapters/embedding/OpenAIAPIEmbeddingAdapter.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type { IntentAction, IntentResult, IntentSource } from "./services/ai/intent.types.js";
+export type { IntentResult, IntentSource } from "./services/ai/intent.types.js";
 export type { AIAnalysis } from "./services/ai/analyze.service.js";
 export type { ConsciousStats } from "./services/brain/conscious.processor.js";
 export type { SubconsciousStats } from "./services/brain/subconscious.routine.js";

@@ -4,6 +4,11 @@ import { ILongTermMemory } from "../../models/LongTermMemory.js";
 import { ICategory } from "../../models/Category.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
 
+export interface ActionInfo {
+  name: string;
+  description: string;
+}
+
 export interface CategoryInfo {
   name: string;
   description: string;
@@ -34,9 +39,13 @@ export interface IStorageAdapter {
   // ─── Shared ───────────────────────────────────────────────────────────────
   getCategories(): Promise<CategoryInfo[]>;
   getUniqueUserIds(): Promise<string[]>;
+  getActions(): Promise<ActionInfo[]>;
+  upsertAction(name: string, description: string, isBuiltIn?: boolean): Promise<void>;
 
   // ─── Intent Context ───────────────────────────────────────────────────────
   findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]>;
+  findSimilarEntries(userId: string, embedding: number[], topK?: number): Promise<IVaultEntry[]>;
+  updateEntryEmbedding(entryId: string, embedding: number[]): Promise<void>;
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
   findDeltaEntries(userId: string, since: Date): Promise<IVaultEntry[]>;

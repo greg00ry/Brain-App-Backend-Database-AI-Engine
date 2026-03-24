@@ -3,8 +3,9 @@ import { VaultEntry, IVaultEntry } from "../../models/VaultEntry.js";
 import { Category, ICategory } from "../../models/Category.js";
 import { LongTermMemory, ILongTermMemory } from "../../models/LongTermMemory.js";
 import { Synapse } from "../../models/Synapse.js";
+import { Action } from "../../models/Action.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
-import { IStorageAdapter, CategoryInfo, EntryAnalysisData } from "./IStorageAdapter.js";
+import { IStorageAdapter, CategoryInfo, EntryAnalysisData, ActionInfo } from "./IStorageAdapter.js";
 import { BRAIN, MEMORY } from "../../config/constants.js";
 
 export class MongoStorageAdapter implements IStorageAdapter {
@@ -55,6 +56,19 @@ export class MongoStorageAdapter implements IStorageAdapter {
     return ids.map((id: unknown) => String(id));
   }
 
+  async getActions(): Promise<ActionInfo[]> {
+    const actions = await Action.find({ isActive: true });
+    return actions.map(a => ({ name: a.name, description: a.description }));
+  }
+
+  async upsertAction(name: string, description: string, isBuiltIn = false): Promise<void> {
+    await Action.findOneAndUpdate(
+      { name },
+      { name, description, isBuiltIn, isActive: true },
+      { upsert: true }
+    );
+  }
+
   // ─── Intent Context ───────────────────────────────────────────────────────
 
   async findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]> {
@@ -70,6 +84,29 @@ export class MongoStorageAdapter implements IStorageAdapter {
       .sort({ 'analysis.strength': -1, lastActivityAt: -1 })
       .limit(MEMORY.CONTEXT_TOP_ENTRIES)
       .lean() as unknown as IVaultEntry[];
+  }
+
+  async findSimilarEntries(userId: string, embedding: number[], topK = 3): Promise<IVaultEntry[]> {
+    const candidates = await VaultEntry.find({
+      userId,
+      embedding: { $exists: true, $ne: [] },
+    })
+      .select('_id rawText analysis embedding')
+      .lean() as unknown as (IVaultEntry & { embedding: number[] })[];
+
+    if (candidates.length === 0) return [];
+
+    const scored = candidates.map(entry => ({
+      entry,
+      score: cosineSimilarity(embedding, entry.embedding),
+    }));
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, topK).map(s => s.entry);
+  }
+
+  async updateEntryEmbedding(entryId: string, embedding: number[]): Promise<void> {
+    await VaultEntry.updateOne({ _id: entryId }, { $set: { embedding } });
   }
 
   // ─── Conscious Processor ──────────────────────────────────────────────────
@@ -209,4 +246,15 @@ export class MongoStorageAdapter implements IStorageAdapter {
   async countEntries(): Promise<number> {
     return VaultEntry.countDocuments();
   }
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }

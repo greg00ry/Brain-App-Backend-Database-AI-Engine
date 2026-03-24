@@ -32,6 +32,11 @@ const vaultEntrySchema = new mongoose.Schema({
     index: true,
   },
 
+  embedding: {
+    type: [Number],
+    default: undefined,
+  },
+
   lastActivityAt: {
     type: Date,
     default: Date.now,
@@ -73,6 +78,7 @@ export interface IVaultEntry extends mongoose.Document {
     category: string;
     isProcessed: boolean;
   };
+  embedding?: number[];
   isAnalyzed: boolean;
   isConsolidated: boolean;
   lastActivityAt: Date;
