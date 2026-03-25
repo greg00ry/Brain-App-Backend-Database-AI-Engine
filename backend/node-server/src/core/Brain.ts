@@ -16,6 +16,7 @@ export type ActionHandler = (
   text: string,
   context: { synapticTree: string; hasContext: boolean },
   llm: ILLMAdapter,
+  chatHistory?: { role: string; content: string }[],
 ) => Promise<string>;
 
 export interface ProcessResult {
@@ -41,9 +42,9 @@ export class Brain {
     private readonly storage: IStorageAdapter,
     private readonly embedding?: IEmbeddingAdapter,
   ) {
-    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }) => {
+    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }, _llm, chatHistory) => {
       const prompt = hasContext
-        ? RESEARCH_ANSWER_PROMPT(text, synapticTree)
+        ? RESEARCH_ANSWER_PROMPT(text, synapticTree, chatHistory)
         : `The user asked: "${text}"\n\nYou don't have anything stored about this yet. Let them know and ask if they want to tell you more.`;
 
       const answer = await this.llm.complete({
@@ -55,10 +56,10 @@ export class Brain {
       return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
 
-    this.handlers.set("SAVE_ONLY", async (_userId, text) => {
+    this.handlers.set("SAVE_ONLY", async (_userId, text, _context, _llm, chatHistory) => {
       const answer = await this.llm.complete({
         systemPrompt: PERSONALITY_SYSTEM_PROMPT,
-        userPrompt: SAVE_RESPONSE_PROMPT(text),
+        userPrompt: SAVE_RESPONSE_PROMPT(text, chatHistory),
         temperature: 0.8,
         maxTokens: 150,
       });
@@ -103,7 +104,7 @@ export class Brain {
 
     if (intent.action === "SAVE_ONLY") {
       const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
-      answer = await handler(userId, text, context, this.llm);
+      answer = await handler(userId, text, context, this.llm, chatHistory);
 
       // Trigger maintenance every N saves (fire and forget)
       this.saveCount++;
@@ -118,7 +119,7 @@ export class Brain {
       return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
-    answer = await handler(userId, text, context, this.llm);
+    answer = await handler(userId, text, context, this.llm, chatHistory);
 
     await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
     await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
