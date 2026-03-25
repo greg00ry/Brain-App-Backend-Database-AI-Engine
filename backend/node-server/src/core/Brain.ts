@@ -9,7 +9,7 @@ import { runConsciousProcessor } from "../services/brain/conscious.processor.js"
 import { RESEARCH_ANSWER_PROMPT } from "../services/ai/prompts/research-answer.prompt.js";
 import { SAVE_RESPONSE_PROMPT } from "../services/ai/prompts/save-response.prompt.js";
 import { PERSONALITY_SYSTEM_PROMPT } from "../services/ai/prompts/personality.prompt.js";
-import { LLM } from "../config/constants.js";
+import { LLM, CHAT } from "../config/constants.js";
 
 export type ActionHandler = (
   userId: string,
@@ -34,6 +34,7 @@ const BUILT_IN_ACTIONS: { name: string; description: string }[] = [
 export class Brain {
   private actionsCache: ActionInfo[] = [];
   private handlers = new Map<string, ActionHandler>();
+  private saveCount = 0;
 
   constructor(
     private readonly llm: ILLMAdapter,
@@ -83,8 +84,11 @@ export class Brain {
 
   // ─── Process ──────────────────────────────────────────────────────────────
 
-  async process(userId: string, text: string, chatHistory?: ChatMessage[]): Promise<ProcessResult> {
+  async process(userId: string, text: string): Promise<ProcessResult> {
     const actions = this.actionsCache.length > 0 ? this.actionsCache : BUILT_IN_ACTIONS;
+
+    // Load persistent chat history from DB
+    const chatHistory = await this.storage.getChatHistory(userId);
 
     const intent = await classifyIntent({ userText: text, chatHistory, actions }, this.llm);
 
@@ -95,14 +99,30 @@ export class Brain {
       return { action: intent.action, answer: `Nieznana akcja: ${intent.action}` };
     }
 
+    let answer: string;
+
     if (intent.action === "SAVE_ONLY") {
-      // Sequential: save first (uses LLM for analysis), then personality response
       const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
-      const answer = await handler(userId, text, context, this.llm);
+      answer = await handler(userId, text, context, this.llm);
+
+      // Trigger maintenance every N saves (fire and forget)
+      this.saveCount++;
+      if (this.saveCount % CHAT.MAINTENANCE_EVERY_N === 0) {
+        this.runMaintenance().catch(err => console.error('[Brain] Maintenance error:', err));
+      }
+
+      // Persist chat history
+      await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
+      await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+
       return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
-    const answer = await handler(userId, text, context, this.llm);
+    answer = await handler(userId, text, context, this.llm);
+
+    await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
+    await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+
     return { action: intent.action, answer };
   }
 

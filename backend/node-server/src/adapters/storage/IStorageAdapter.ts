@@ -42,6 +42,10 @@ export interface IStorageAdapter {
   getActions(): Promise<ActionInfo[]>;
   upsertAction(name: string, description: string, isBuiltIn?: boolean): Promise<void>;
 
+  // ─── Chat History ─────────────────────────────────────────────────────────
+  getChatHistory(userId: string): Promise<{ role: "user" | "assistant"; content: string }[]>;
+  appendChatMessage(userId: string, role: "user" | "assistant", content: string, maxMessages: number): Promise<void>;
+
   // ─── Intent Context ───────────────────────────────────────────────────────
   findRelevantEntries(userId: string, keywords: string[]): Promise<IVaultEntry[]>;
   findSimilarEntries(userId: string, embedding: number[], topK?: number): Promise<IVaultEntry[]>;
