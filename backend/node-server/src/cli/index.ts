@@ -113,8 +113,6 @@ program
   .action(async () => {
     await setup();
 
-    const chatHistory: { role: 'user' | 'assistant'; content: string }[] = [];
-
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -127,12 +125,9 @@ program
         const text = input.trim();
         if (!text) { ask(); return; }
 
-        chatHistory.push({ role: 'user', content: text });
-
         try {
-          const result = await brain.process(USER_ID, text, chatHistory);
+          const result = await brain.process(USER_ID, text);
           console.log(`\nBrain: ${result.answer}\n`);
-          chatHistory.push({ role: 'assistant', content: result.answer });
         } catch (err) {
           console.error('Error:', err);
         }

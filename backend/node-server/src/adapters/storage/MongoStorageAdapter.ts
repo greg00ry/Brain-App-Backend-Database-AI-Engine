@@ -4,6 +4,7 @@ import { Category, ICategory } from "../../models/Category.js";
 import { LongTermMemory, ILongTermMemory } from "../../models/LongTermMemory.js";
 import { Synapse } from "../../models/Synapse.js";
 import { Action } from "../../models/Action.js";
+import { ChatHistory } from "../../models/ChatHistory.js";
 import { TopicAnalysis, LongTermMemoryData } from "../../types/brain.js";
 import { IStorageAdapter, CategoryInfo, EntryAnalysisData, ActionInfo } from "./IStorageAdapter.js";
 import { BRAIN, MEMORY } from "../../config/constants.js";
@@ -59,6 +60,23 @@ export class MongoStorageAdapter implements IStorageAdapter {
   async getActions(): Promise<ActionInfo[]> {
     const actions = await Action.find({ isActive: true });
     return actions.map(a => ({ name: a.name, description: a.description }));
+  }
+
+  async getChatHistory(userId: string): Promise<{ role: "user" | "assistant"; content: string }[]> {
+    const doc = await ChatHistory.findOne({ userId });
+    if (!doc) return [];
+    return doc.messages.map(m => ({ role: m.role, content: m.content }));
+  }
+
+  async appendChatMessage(userId: string, role: "user" | "assistant", content: string, maxMessages: number): Promise<void> {
+    await ChatHistory.findOneAndUpdate(
+      { userId },
+      {
+        $push: { messages: { $each: [{ role, content }], $slice: -maxMessages } },
+        $set: { updatedAt: new Date() },
+      },
+      { upsert: true }
+    );
   }
 
   async upsertAction(name: string, description: string, isBuiltIn = false): Promise<void> {

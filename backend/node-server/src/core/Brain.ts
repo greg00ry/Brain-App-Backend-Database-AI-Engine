@@ -9,13 +9,14 @@ import { runConsciousProcessor } from "../services/brain/conscious.processor.js"
 import { RESEARCH_ANSWER_PROMPT } from "../services/ai/prompts/research-answer.prompt.js";
 import { SAVE_RESPONSE_PROMPT } from "../services/ai/prompts/save-response.prompt.js";
 import { PERSONALITY_SYSTEM_PROMPT } from "../services/ai/prompts/personality.prompt.js";
-import { LLM } from "../config/constants.js";
+import { LLM, CHAT } from "../config/constants.js";
 
 export type ActionHandler = (
   userId: string,
   text: string,
   context: { synapticTree: string; hasContext: boolean },
   llm: ILLMAdapter,
+  chatHistory?: { role: string; content: string }[],
 ) => Promise<string>;
 
 export interface ProcessResult {
@@ -34,15 +35,16 @@ const BUILT_IN_ACTIONS: { name: string; description: string }[] = [
 export class Brain {
   private actionsCache: ActionInfo[] = [];
   private handlers = new Map<string, ActionHandler>();
+  private saveCount = 0;
 
   constructor(
     private readonly llm: ILLMAdapter,
     private readonly storage: IStorageAdapter,
     private readonly embedding?: IEmbeddingAdapter,
   ) {
-    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }) => {
+    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }, _llm, chatHistory) => {
       const prompt = hasContext
-        ? RESEARCH_ANSWER_PROMPT(text, synapticTree)
+        ? RESEARCH_ANSWER_PROMPT(text, synapticTree, chatHistory)
         : `The user asked: "${text}"\n\nYou don't have anything stored about this yet. Let them know and ask if they want to tell you more.`;
 
       const answer = await this.llm.complete({
@@ -54,10 +56,10 @@ export class Brain {
       return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
 
-    this.handlers.set("SAVE_ONLY", async (_userId, text) => {
+    this.handlers.set("SAVE_ONLY", async (_userId, text, _context, _llm, chatHistory) => {
       const answer = await this.llm.complete({
         systemPrompt: PERSONALITY_SYSTEM_PROMPT,
-        userPrompt: SAVE_RESPONSE_PROMPT(text),
+        userPrompt: SAVE_RESPONSE_PROMPT(text, chatHistory),
         temperature: 0.8,
         maxTokens: 150,
       });
@@ -83,8 +85,11 @@ export class Brain {
 
   // ─── Process ──────────────────────────────────────────────────────────────
 
-  async process(userId: string, text: string, chatHistory?: ChatMessage[]): Promise<ProcessResult> {
+  async process(userId: string, text: string): Promise<ProcessResult> {
     const actions = this.actionsCache.length > 0 ? this.actionsCache : BUILT_IN_ACTIONS;
+
+    // Load persistent chat history from DB
+    const chatHistory = await this.storage.getChatHistory(userId);
 
     const intent = await classifyIntent({ userText: text, chatHistory, actions }, this.llm);
 
@@ -95,14 +100,30 @@ export class Brain {
       return { action: intent.action, answer: `Nieznana akcja: ${intent.action}` };
     }
 
+    let answer: string;
+
     if (intent.action === "SAVE_ONLY") {
-      // Sequential: save first (uses LLM for analysis), then personality response
       const entry = await proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
-      const answer = await handler(userId, text, context, this.llm);
+      answer = await handler(userId, text, context, this.llm, chatHistory);
+
+      // Trigger maintenance every N saves (fire and forget)
+      this.saveCount++;
+      if (this.saveCount % CHAT.MAINTENANCE_EVERY_N === 0) {
+        this.runMaintenance().catch(err => console.error('[Brain] Maintenance error:', err));
+      }
+
+      // Persist chat history
+      await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
+      await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+
       return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
-    const answer = await handler(userId, text, context, this.llm);
+    answer = await handler(userId, text, context, this.llm, chatHistory);
+
+    await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
+    await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+
     return { action: intent.action, answer };
   }
 
