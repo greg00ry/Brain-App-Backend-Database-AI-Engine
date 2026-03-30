@@ -28,8 +28,8 @@ export interface ProcessResult {
 // ─── Built-in handlers ────────────────────────────────────────────────────────
 
 const BUILT_IN_ACTIONS: { name: string; description: string }[] = [
-  { name: "RESEARCH_BRAIN", description: "user asks a question about past notes, memory, or stored knowledge" },
-  { name: "SAVE_ONLY", description: "user states a fact, shares info, or wants to store something" },
+  { name: "SAVE_ONLY", description: "user states a fact, shares info, opinion, preference, or wants to store something" },
+  { name: "RESEARCH_BRAIN", description: "user explicitly asks a question about past notes, memory, or stored knowledge" },
 ];
 
 export class Brain {

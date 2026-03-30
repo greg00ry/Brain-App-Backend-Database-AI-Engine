@@ -79,10 +79,58 @@ const RULES: Rule[] = [
     confidence: 95,
     reasoning: "Explicit save command",
   },
+
+  // ─── SAVE_ONLY — declarative statements (high confidence signals) ─────────
+  {
+    patterns: [
+      /\bi\s+prefer\b/i,
+      /\bi\s+like\b/i,
+      /\bi\s+hate\b/i,
+      /\bi\s+love\b/i,
+      /\bi\s+always\b/i,
+      /\bi\s+never\b/i,
+      /\bi\s+work\s+best\b/i,
+      /^my\s+goal\b/i,
+      /^my\s+goals?\s+for\b/i,
+      /\bi\s+think\s+that\b/i,
+      /\bi\s+believe\b/i,
+      /\bi\s+learned\b/i,
+      /\bi\s+realized\b/i,
+      /\bi\s+(don't|do\s+not)\s+(like|enjoy|use)\b/i,
+    ],
+    action: "SAVE_ONLY",
+    confidence: 85,
+    reasoning: "Declarative personal statement",
+  },
+  {
+    patterns: [
+      /\bwolę\b/i,
+      /\blubię\b/i,
+      /\bnienawidzę\b/i,
+      /\bmoim\s+celem\b/i,
+      /\bmój\s+cel\b/i,
+      /\buważam,?\s+że\b/i,
+      /\bstwierdziłem\b/i,
+      /\bnauczyłem\s+się\b/i,
+      /\bpracuję\s+najlepiej\b/i,
+      /\bzauważyłem\b/i,
+    ],
+    action: "SAVE_ONLY",
+    confidence: 85,
+    reasoning: "Declarative personal statement (Polish)",
+  },
 ];
 
+const QUESTION_PATTERN = /^\s*(when|what|where|who|how|why|did|do|does|can|could|would|should|is|are|have|had|kiedy|co|gdzie|kto|jak|dlaczego|czy)\b|\?$/i;
+
 export function matchRules(text: string): RuleMatch | null {
+  const isQuestion = QUESTION_PATTERN.test(text);
+
   for (const rule of RULES) {
+    // Skip declarative save rules if input looks like a question
+    if (isQuestion && rule.action === "SAVE_ONLY" && rule.confidence < 95) {
+      continue;
+    }
     if (rule.patterns.some(p => p.test(text))) {
       return {
         action: rule.action,

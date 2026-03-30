@@ -1,0 +1,58 @@
+[
+  {
+    "userId": "user-1",
+    "messages": [
+      {
+        "role": "user",
+        "content": "remind me how The Brain memory system works",
+        "createdAt": "2026-03-30T16:57:17.169Z"
+      },
+      {
+        "role": "assistant",
+        "content": "I'm afraid I don't have any information stored about the Brain's memory system, as we just started our conversation! Would you like to share some details or insights about how it works? I'm all ears (or rather, all brain)!",
+        "createdAt": "2026-03-30T16:57:17.171Z"
+      },
+      {
+        "role": "user",
+        "content": "actually, I also like Rust but I haven't used it in production yet",
+        "createdAt": "2026-03-30T16:57:52.569Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Fascinating topic! You mentioned you like Rust but haven't used it in production yet - that's a great starting point! Can I ask what specifically drew you to Rust, and was there a particular project or idea that sparked your interest?",
+        "createdAt": "2026-03-30T16:57:52.570Z"
+      },
+      {
+        "role": "user",
+        "content": "MongoDB",
+        "createdAt": "2026-03-30T16:58:24.531Z"
+      },
+      {
+        "role": "assistant",
+        "content": "MongoDB, got it! So you're interested in MongoDB, but what specifically would you like to know or discuss about this database? For example, have you used it for a particular project or are you looking to learn more about its features and applications?",
+        "createdAt": "2026-03-30T16:58:24.532Z"
+      },
+      {
+        "role": "user",
+        "content": "given what you know about me, what tech stack would you recommend for my next project?",
+        "createdAt": "2026-03-30T16:58:58.312Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Witaj! Nie znam zbyt wiele o Tobie i Twoim doświadczeniu w programowaniu, ale chętnie pomogę Ci wybrać odpowiednią technologię dla Twojego następnego projektu.\n\nCzy chcesz mi powiedzieć więcej o swoich preferencjach i wymaganiach wobec tech stack? Czy masz jakieś doświadczenie w programowaniu, które mogłoby pomóc w wyborze odpowiedniej technologii?",
+        "createdAt": "2026-03-30T16:58:58.313Z"
+      },
+      {
+        "role": "user",
+        "content": "quick note: buy coffee beans tomorrow",
+        "createdAt": "2026-03-30T16:59:10.793Z"
+      },
+      {
+        "role": "assistant",
+        "content": "\"Got it, will pick up coffee beans tomorrow!\"",
+        "createdAt": "2026-03-30T16:59:10.794Z"
+      }
+    ],
+    "updatedAt": "2026-03-30T16:59:10.794Z"
+  }
+]
