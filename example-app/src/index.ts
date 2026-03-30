@@ -5,7 +5,7 @@ import { FileStorageAdapter } from "@the-brain/adapter-files";
 
 const llm = new OpenAICompatibleAdapter(
   "http://localhost:11434/v1/chat/completions",
-  "llama3.2",
+  "llama3",
 );
 
 const embedding = new OpenAICompatibleEmbeddingAdapter(
