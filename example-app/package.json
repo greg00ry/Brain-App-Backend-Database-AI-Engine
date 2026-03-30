@@ -1,0 +1,17 @@
+{
+  "name": "my-brain-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@the-brain/core": "^0.1.0",
+    "@the-brain/adapter-files": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.3",
+    "@types/node": "^22.0.0"
+  }
+}
