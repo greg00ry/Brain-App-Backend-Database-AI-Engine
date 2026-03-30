@@ -25,12 +25,13 @@ npm install @the-brain/core @the-brain/adapter-files
 ```
 
 ```typescript
-import { Brain, OpenAICompatibleAdapter } from "@the-brain/core";
+import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
 import { FileStorageAdapter } from "@the-brain/adapter-files";
 
 const brain = new Brain(
-  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3"),
+  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3.2"),
   new FileStorageAdapter("./.brain"),
+  new OpenAICompatibleEmbeddingAdapter("http://localhost:11434/v1/embeddings", "nomic-embed-text"),
 );
 
 await brain.loadActions();
@@ -39,7 +40,9 @@ const result = await brain.process("user-1", "I prefer functional programming");
 console.log(result.answer);
 ```
 
-Zero config. No MongoDB. No cloud. Works with any Ollama model.
+Zero config. No MongoDB. No cloud. Works with Ollama.
+
+> **Note:** Embeddings require `nomic-embed-text` in Ollama (`ollama pull nomic-embed-text`). Without them, recall falls back to keyword search. For full Graph RAG and synapses, use `@the-brain/adapter-mongo`.
 
 ---
 
@@ -229,9 +232,8 @@ See [`example-app/`](./example-app) for a minimal working example:
 ## Known Limitations
 
 - **Custom action handlers** — `registerAction` works but handlers don't survive restarts (re-register on startup)
-- **FileAdapter** — no semantic search (embeddings), no Graph RAG, no synapses
+- **FileAdapter** — no Graph RAG, no synapses; semantic search requires embedding adapter
 - **No SQLite adapter** — coming next
-- **No MCP server** — Claude/Cursor integration planned
 
 ---
 
@@ -249,7 +251,8 @@ See [`example-app/`](./example-app) for a minimal working example:
 - [x] 26 passing tests, CI on GitHub Actions
 
 ### Next
-- [ ] MCP server (`@the-brain/mcp`) — Claude Code / Cursor integration
+- [x] MCP server (`@the-brain/mcp`) — Claude Code / Cursor integration
+- [ ] Semantic search in FileStorageAdapter (cosine similarity without MongoDB)
 - [ ] SQLite adapter
 - [ ] Persistent action handlers
 - [ ] API documentation
