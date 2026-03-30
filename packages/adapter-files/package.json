@@ -12,14 +12,17 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "peerDependencies": {
     "@the-brain/core": "*"
   },
   "devDependencies": {
     "@the-brain/core": "*",
+    "@types/node": "^22.0.0",
     "typescript": "^5.5.3",
-    "@types/node": "^22.0.0"
+    "vitest": "^4.1.2"
   }
 }
