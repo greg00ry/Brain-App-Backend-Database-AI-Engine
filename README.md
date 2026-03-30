@@ -18,6 +18,42 @@ The Brain is infrastructure. It defines **how a local AI agent should work** —
 
 ---
 
+## Quick Start
+
+```bash
+npm install @the-brain/core @the-brain/adapter-files
+```
+
+```typescript
+import { Brain, OpenAICompatibleAdapter } from "@the-brain/core";
+import { FileStorageAdapter } from "@the-brain/adapter-files";
+
+const brain = new Brain(
+  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3"),
+  new FileStorageAdapter("./.brain"),
+);
+
+await brain.loadActions();
+
+const result = await brain.process("user-1", "I prefer functional programming");
+console.log(result.answer);
+```
+
+Zero config. No MongoDB. No cloud. Works with any Ollama model.
+
+---
+
+## Packages
+
+| Package | Description | npm |
+|---|---|---|
+| `@the-brain/core` | Core framework — Brain class, intent routing, memory, adapters | [![npm](https://img.shields.io/npm/v/@the-brain/core)](https://www.npmjs.com/package/@the-brain/core) |
+| `@the-brain/adapter-mongo` | MongoDB storage adapter (enables Graph RAG, synapses) | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-mongo)](https://www.npmjs.com/package/@the-brain/adapter-mongo) |
+| `@the-brain/adapter-files` | File-based storage adapter (zero config, no DB needed) | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-files)](https://www.npmjs.com/package/@the-brain/adapter-files) |
+| `@the-brain/cli` | Interactive CLI — chat with your Brain from terminal | [![npm](https://img.shields.io/npm/v/@the-brain/cli)](https://www.npmjs.com/package/@the-brain/cli) |
+
+---
+
 ## What Makes This Different
 
 ### 1. Hybrid Intent Routing
@@ -40,17 +76,23 @@ Not just a vector database. Actual forgetting mechanism.
 - **Subconscious routine** — pure math, deterministic pruning, no LLM needed
 - **Conscious consolidation** — AI-driven, strong memories → long-term
 - **Graph RAG** — synaptic connections between entries, not just similarity search
-- **Semantic search** — embeddings via OpenAI-compatible API
+- **Semantic search** — embeddings via any OpenAI-compatible API
 
 ### 3. Dynamic Action Registry
 Actions stored in DB, not hardcoded. Add a new action without editing prompts.
 
 ```typescript
 await brain.registerAction(
-  "SEND_EMAIL",
-  "user wants to send an email to someone",
-  async (userId, text, context, llm) => {
-    // your handler
+  "TRADING_SIGNAL",
+  "user asks about trading signals or market analysis",
+  async (userId, text, { synapticTree, hasContext }, llm) => {
+    const context = hasContext ? `\nRelevant memory:\n${synapticTree}` : "";
+    const answer = await llm.complete({
+      userPrompt: `Analyze trading signal: "${text}"${context}`,
+      temperature: 0.3,
+      maxTokens: 200,
+    });
+    return answer ?? "Could not analyze.";
   }
 );
 ```
@@ -58,17 +100,17 @@ await brain.registerAction(
 Prompt rebuilds automatically from registered actions.
 
 ### 4. LLM Agnostic
-One adapter works with everything that speaks OpenAI API:
+One adapter works with everything that speaks OpenAI-compatible API:
 
 ```typescript
-// LM Studio (local)
-new OpenAIAPIAdapter("http://localhost:1234/v1/chat/completions")
+// Ollama (local, recommended)
+new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3")
 
-// Ollama (local)
-new OpenAIAPIAdapter("http://localhost:11434/v1/chat/completions")
+// LM Studio (local)
+new OpenAICompatibleAdapter("http://localhost:1234/v1/chat/completions", "local-model")
 
 // OpenAI (cloud)
-new OpenAIAPIAdapter("https://api.openai.com/v1/chat/completions", "gpt-4o", apiKey)
+new OpenAICompatibleAdapter("https://api.openai.com/v1/chat/completions", "gpt-4o", apiKey)
 ```
 
 ---
@@ -77,7 +119,7 @@ new OpenAIAPIAdapter("https://api.openai.com/v1/chat/completions", "gpt-4o", api
 
 ```
 ┌─────────────────────────────────────────┐
-│           Brain (core)                  │
+│           @the-brain/core               │
 │                                         │
 │  Intent Router                          │
 │  (rules → LLM → confidence → action)   │
@@ -94,122 +136,128 @@ new OpenAIAPIAdapter("https://api.openai.com/v1/chat/completions", "gpt-4o", api
   LLM      Storage    Embedding
  Adapter   Adapter    Adapter
     │          │          │
- Any OpenAI  MongoDB   Any OpenAI
- compatible  (more      compatible
-    API      coming)       API
+ Any OpenAI  Files /   Any OpenAI
+ compatible  MongoDB /  compatible
+    API      SQLite *      API
+
+* coming soon
 ```
 
 ---
 
-## Quick Start
+## Storage Adapters
 
-### Prerequisites
-
-- Node.js 18+
-- MongoDB
-- Ollama (`brew install ollama`) with `nomic-embed-text` model
-- Any OpenAI-compatible LLM (LM Studio, Ollama, OpenAI)
-
-### Setup
-
-```bash
-cd backend/node-server
-npm install
-cp .env.example .env
-# Edit .env
-npm run seed:categories
-```
-
-### .env
-
-```bash
-MONGODB_URI=mongodb://localhost:27017/brain-app
-LLM_API_URL=http://localhost:1234/v1/chat/completions
-LLM_MODEL=local-model
-LLM_API_KEY=local
-EMBEDDING_API_URL=http://localhost:11434/v1/embeddings
-EMBEDDING_MODEL=nomic-embed-text
-BRAIN_USER_ID=default
-```
-
-### CLI
-
-```bash
-# Interactive chat
-npm run brain
-
-# Single commands
-npm run brain -- process "What do I know about TypeScript?"
-npm run brain -- save "I prefer functional programming"
-npm run brain -- recall "programming preferences"
-npm run brain -- maintenance
-```
-
----
-
-## Using as Framework
+| Adapter | Setup | Features |
+|---|---|---|
+| `FileStorageAdapter` | Zero config | Basic memory, keyword search, chat history |
+| `MongoStorageAdapter` | MongoDB required | + Graph RAG, synapses, semantic search, consolidation |
 
 ```typescript
-import { Brain, OpenAIAPIAdapter, MongoStorageAdapter, OpenAIAPIEmbeddingAdapter } from './src/index.js';
-import { connectDB } from './src/config/db.js';
+// Zero config
+import { FileStorageAdapter } from "@the-brain/adapter-files";
+new FileStorageAdapter("./.brain")
 
-await connectDB();
+// Full features
+import { MongoStorageAdapter } from "@the-brain/adapter-mongo";
+new MongoStorageAdapter() // reads MONGODB_URI from env
+```
+
+---
+
+## With MongoDB (Full Features)
+
+```bash
+npm install @the-brain/core @the-brain/adapter-mongo mongoose
+```
+
+```typescript
+import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
+import { MongoStorageAdapter, connectDB } from "@the-brain/adapter-mongo";
+
+await connectDB(); // MONGODB_URI env var
 
 const brain = new Brain(
-  new OpenAIAPIAdapter("http://localhost:1234/v1/chat/completions"),
+  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3"),
   new MongoStorageAdapter(),
-  new OpenAIAPIEmbeddingAdapter("http://localhost:11434/v1/embeddings"),
+  new OpenAICompatibleEmbeddingAdapter("http://localhost:11434/v1/embeddings", "nomic-embed-text"),
 );
 
 await brain.loadActions();
-
-// Register custom action
-await brain.registerAction(
-  "SEND_EMAIL",
-  "user wants to send an email to someone",
-  async (userId, text, context, llm) => {
-    // compose and send email
-    return "Email sent.";
-  }
-);
-
-// Process user input — Brain decides what to do
-const result = await brain.process(userId, "Send email to John about the meeting");
-console.log(result.answer);
 ```
 
 ---
 
-## Known Limitations (pre-publish)
+## CLI
 
-- **MongoDB required** — no FileAdapter yet, barrier to entry
-- **Custom actions** — `registerAction` works but handlers are in-memory only, no persistence across restarts
-- **Local LLM stack** — two services needed (LM Studio + Ollama), migration to Ollama-only planned
-- **No tests** — zero unit/integration coverage
-- **No API documentation** — coming before npm publish
-- **Categories required** — run `npm run seed:categories` before conscious processor works
+```bash
+npm install -g @the-brain/cli
+```
+
+```bash
+# Interactive chat (default)
+brain
+
+# Single commands
+brain process "What do I know about TypeScript?"
+brain save "I prefer functional programming"
+brain recall "programming preferences"
+brain maintenance
+```
+
+Configure via `.env`:
+
+```bash
+MONGODB_URI=mongodb://localhost:27017/the-brain
+LLM_API_URL=http://localhost:11434/v1/chat/completions
+LLM_MODEL=llama3
+EMBEDDING_API_URL=http://localhost:11434/v1/embeddings
+EMBEDDING_MODEL=nomic-embed-text
+```
+
+---
+
+## Example App
+
+See [`example-app/`](./example-app) for a minimal working example:
+- FileStorageAdapter (no MongoDB)
+- Custom `TRADING_SIGNAL` action
+- Ollama as LLM backend
+- 40 lines of code
+
+---
+
+## Known Limitations
+
+- **Custom action handlers** — `registerAction` works but handlers don't survive restarts (re-register on startup)
+- **FileAdapter** — no semantic search (embeddings), no Graph RAG, no synapses
+- **No SQLite adapter** — coming next
+- **No MCP server** — Claude/Cursor integration planned
 
 ---
 
 ## Roadmap
 
-### Phase 1 — Pre-publish (current)
-- [ ] FileAdapter (zero-config storage)
-- [ ] Migrate to Ollama-only (single local LLM service)
+### Now
+- [x] `@the-brain/core` on npm
+- [x] `@the-brain/adapter-mongo` on npm
+- [x] `@the-brain/adapter-files` on npm
+- [x] `@the-brain/cli` on npm
+- [x] Hybrid intent routing (rules + LLM + confidence)
+- [x] Biologically-inspired memory (decay, consolidation, Graph RAG)
+- [x] Dynamic action registry
+- [x] Ollama-only setup (one local LLM service)
+- [x] 26 passing tests, CI on GitHub Actions
+
+### Next
+- [ ] MCP server (`@the-brain/mcp`) — Claude Code / Cursor integration
+- [ ] SQLite adapter
 - [ ] Persistent action handlers
-- [ ] Basic test coverage
 - [ ] API documentation
 
-### Phase 2 — npm publish
-- [ ] `@the-brain/core` on npm
-- [ ] MCP server (Claude integration)
-- [ ] SQLite adapter
-- [ ] Community examples
-
-### Phase 3 — Ecosystem
+### Later
 - [ ] PostgreSQL adapter
 - [ ] Shell integration (`brain-do`, `brain-explain`)
-- [ ] Additional LLM adapters (Anthropic, Gemini)
+- [ ] Additional LLM adapters (Anthropic native, Gemini)
 
 ---
 
@@ -224,11 +272,3 @@ Prevents corporate capture. Network copyleft means cloud services built on The B
 **Grzegorz Trzaskoma** — Warsaw, Poland
 
 Building privacy-first AI infrastructure. Local LLMs should be competitive with cloud. Users should own their AI.
-
----
-
-## Status
-
-**Alpha** — core works, known limitations documented above. Not ready for npm publish yet.
-
-**Active development on:** `framework-extension` branch
