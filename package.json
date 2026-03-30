@@ -1,0 +1,9 @@
+{
+  "name": "the-brain",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build -w packages/core && npm run build -w packages/adapter-mongo && npm run build -w packages/adapter-files && npm run build -w packages/cli",
+    "dev": "npm run dev -w packages/cli"
+  }
+}

@@ -4,11 +4,9 @@ dotenv.config();
 
 import { Command } from "commander";
 import * as readline from "readline";
-import { connectDB } from "../config/db.js";
-import { Brain } from "../core/Brain.js";
-import { OpenAIAPIAdapter } from "../adapters/llm/OpenAIAPIAdapter.js";
-import { OpenAIAPIEmbeddingAdapter } from "../adapters/embedding/OpenAIAPIEmbeddingAdapter.js";
-import { MongoStorageAdapter } from "../adapters/storage/MongoStorageAdapter.js";
+import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
+import { MongoStorageAdapter, connectDB } from "@the-brain/adapter-mongo";
+import mongoose from "mongoose";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -24,9 +22,9 @@ const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL ?? "nomic-embed-text";
 // ─── Brain ────────────────────────────────────────────────────────────────────
 
 const brain = new Brain(
-  new OpenAIAPIAdapter(LLM_URL, LLM_MODEL, LLM_API_KEY),
+  new OpenAICompatibleAdapter(LLM_URL, LLM_MODEL, LLM_API_KEY),
   new MongoStorageAdapter(),
-  new OpenAIAPIEmbeddingAdapter(EMBEDDING_URL, EMBEDDING_MODEL),
+  new OpenAICompatibleEmbeddingAdapter(EMBEDDING_URL, EMBEDDING_MODEL),
 );
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -37,8 +35,7 @@ async function setup() {
 }
 
 async function teardown() {
-  const mongoose = await import("mongoose");
-  await mongoose.default.disconnect();
+  await mongoose.disconnect();
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────

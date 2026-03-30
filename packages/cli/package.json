@@ -1,0 +1,29 @@
+{
+  "name": "@the-brain/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "brain": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "brain": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "dotenv": "^16.4.5"
+  },
+  "peerDependencies": {
+    "@the-brain/core": "*",
+    "@the-brain/adapter-mongo": "*"
+  },
+  "devDependencies": {
+    "@the-brain/core": "*",
+    "@the-brain/adapter-mongo": "*",
+    "mongoose": "^8.5.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.3",
+    "@types/node": "^22.0.0"
+  }
+}

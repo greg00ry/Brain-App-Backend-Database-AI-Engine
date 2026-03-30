@@ -1,0 +1,25 @@
+{
+  "name": "@the-brain/adapter-files",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "peerDependencies": {
+    "@the-brain/core": "*"
+  },
+  "devDependencies": {
+    "@the-brain/core": "*",
+    "typescript": "^5.5.3",
+    "@types/node": "^22.0.0"
+  }
+}
