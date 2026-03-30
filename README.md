@@ -2,7 +2,8 @@
 
 > **Privacy-first AI framework for cognitive memory and intent routing**
 
-[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/greg00ry/Brain-App-Backend-Database-AI-Engine)
+[![CI](https://github.com/greg00ry/the-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/greg00ry/the-brain/actions/workflows/ci.yml)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/greg00ry/the-brain)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 ---
