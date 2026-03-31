@@ -1,0 +1,345 @@
+import { describe, it, expect, vi } from "vitest";
+import { proccessAndStore } from "../services/ingest/ingest.service.js";
+import { analyzeTextWithAI } from "../services/ai/analyze.service.js";
+import { ILLMAdapter } from "../adapters/ILLMAdapter.js";
+import { IStorageAdapter } from "../adapters/IStorageAdapter.js";
+import { IEmbeddingAdapter } from "../adapters/IEmbeddingAdapter.js";
+import { IVaultEntry } from "../types/brain.js";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeLLM(response: string | null): ILLMAdapter {
+  return { complete: vi.fn().mockResolvedValue(response) };
+}
+
+function makeLLMError(): ILLMAdapter {
+  return { complete: vi.fn().mockRejectedValue(new Error("LLM timeout")) };
+}
+
+function llmAnalysis(overrides = {}) {
+  return JSON.stringify({
+    summary: "Test summary",
+    tags: ["python", "test"],
+    strength: 7,
+    category: "Tech",
+    ...overrides,
+  });
+}
+
+function makeEntry(id = "entry-1"): IVaultEntry {
+  return {
+    _id: { toString: () => id },
+    userId: "user-1",
+    rawText: "test",
+    isAnalyzed: true,
+    isConsolidated: false,
+    lastActivityAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    analysis: { summary: "s", tags: [], strength: 5, category: "Tech", isProcessed: true },
+  };
+}
+
+function makeStorage(entry = makeEntry()): IStorageAdapter {
+  return {
+    createEntry: vi.fn().mockResolvedValue(entry),
+    updateEntryEmbedding: vi.fn().mockResolvedValue(undefined),
+    // unused
+    getEntryById: vi.fn(), getVaultData: vi.fn(), deleteVaultEntry: vi.fn(),
+    getCategories: vi.fn(), getUniqueUserIds: vi.fn(), getActions: vi.fn(),
+    upsertAction: vi.fn(), getChatHistory: vi.fn(), appendChatMessage: vi.fn(),
+    findRelevantEntries: vi.fn(), findSimilarEntries: vi.fn(),
+    findDeltaEntries: vi.fn(), findContextEntries: vi.fn(),
+    applyTopicAnalysis: vi.fn(), findStrongEntries: vi.fn(), upsertLTM: vi.fn(),
+    markConsolidated: vi.fn(), processSynapseLinks: vi.fn(),
+    getConsolidatedEntryIds: vi.fn(), findEntriesToDecay: vi.fn(),
+    decayEntries: vi.fn(), pruneDeadEntries: vi.fn(), pruneDeadSynapses: vi.fn(),
+    findEntriesReadyForLTM: vi.fn(), countEntries: vi.fn(),
+    getSynapsesBySource: vi.fn(),
+  } as unknown as IStorageAdapter;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// analyzeTextWithAI
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("analyzeTextWithAI", () => {
+
+  // ─── Happy path ────────────────────────────────────────────────────────────
+
+  it("parses valid LLM JSON response", async () => {
+    const llm = makeLLM(llmAnalysis());
+    const result = await analyzeTextWithAI("python tips", llm);
+    expect(result.summary).toBe("Test summary");
+    expect(result.tags).toEqual(["python", "test"]);
+    expect(result.strength).toBe(7);
+    expect(result.category).toBe("Tech");
+    expect(result.isProcessed).toBe(true);
+  });
+
+  it("sets isProcessed=true on successful parse", async () => {
+    const result = await analyzeTextWithAI("text", makeLLM(llmAnalysis()));
+    expect(result.isProcessed).toBe(true);
+  });
+
+  // ─── Fallback: null response ───────────────────────────────────────────────
+
+  it("returns FALLBACK when LLM returns null", async () => {
+    const result = await analyzeTextWithAI("hello world", makeLLM(null));
+    expect(result.isProcessed).toBe(false);
+    expect(result.tags).toEqual(["unprocessed"]);
+    expect(result.strength).toBe(5);
+    expect(result.category).toBe("Uncategorized");
+  });
+
+  it("FALLBACK summary is text.substring(0,100) + '...'", async () => {
+    const text = "short";
+    const result = await analyzeTextWithAI(text, makeLLM(null));
+    // always appends '...' even for short text — misleading truncation marker
+    expect(result.summary).toBe("short...");
+  });
+
+  it("FALLBACK truncates text at 100 chars and appends '...'", async () => {
+    const text = "x".repeat(150);
+    const result = await analyzeTextWithAI(text, makeLLM(null));
+    expect(result.summary).toBe("x".repeat(100) + "...");
+    expect(result.summary.length).toBe(103);
+  });
+
+  it("FALLBACK summary appends '...' to exact 100-char text too", async () => {
+    // Documents: even text exactly 100 chars gets '...' appended
+    const text = "x".repeat(100);
+    const result = await analyzeTextWithAI(text, makeLLM(null));
+    expect(result.summary).toBe("x".repeat(100) + "...");
+  });
+
+  // ─── Fallback: invalid JSON ────────────────────────────────────────────────
+
+  it("returns FALLBACK when LLM returns invalid JSON", async () => {
+    const result = await analyzeTextWithAI("text", makeLLM("not json"));
+    expect(result.isProcessed).toBe(false);
+    expect(result.tags).toEqual(["unprocessed"]);
+  });
+
+  it("returns FALLBACK when LLM returns empty string", async () => {
+    // empty string → cleanAndParseJSON returns null → FALLBACK
+    const result = await analyzeTextWithAI("text", makeLLM(""));
+    expect(result.isProcessed).toBe(false);
+  });
+
+  // ─── LLM throws ───────────────────────────────────────────────────────────
+
+  it("propagates LLM error — no try/catch (unlike embedding which is non-fatal)", async () => {
+    // This is an inconsistency: embedding errors are swallowed, LLM errors are not
+    await expect(analyzeTextWithAI("text", makeLLMError())).rejects.toThrow("LLM timeout");
+  });
+
+  // ─── Missing fields in LLM response ──────────────────────────────────────
+
+  it("missing summary falls back to text.substring(0, 50)", async () => {
+    const text = "x".repeat(80);
+    const llm = makeLLM(JSON.stringify({ tags: [], strength: 5, category: "Tech" }));
+    const result = await analyzeTextWithAI(text, llm);
+    // NOTE: fallback here uses 50, not 100 like FALLBACK_ANALYSIS — inconsistency
+    expect(result.summary).toBe("x".repeat(50));
+    expect(result.isProcessed).toBe(true); // still isProcessed=true
+  });
+
+  it("missing tags defaults to empty array", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", strength: 5, category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.tags).toEqual([]);
+  });
+
+  it("tags not an array defaults to empty array", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: "python", strength: 5, category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.tags).toEqual([]);
+  });
+
+  it("missing category defaults to 'Other'", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: [], strength: 5 }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.category).toBe("Other");
+  });
+
+  it("missing strength defaults to 0", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: [], category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.strength).toBe(0);
+  });
+
+  it("strength as string '8' is coerced to number 8", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: [], strength: "8", category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.strength).toBe(8);
+  });
+
+  it("strength as non-numeric string defaults to 0", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: [], strength: "high", category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    expect(result.strength).toBe(0);
+  });
+
+  it("strength=0 from LLM is returned as 0 (not overridden)", async () => {
+    const llm = makeLLM(JSON.stringify({ summary: "s", tags: [], strength: 0, category: "Tech" }));
+    const result = await analyzeTextWithAI("text", llm);
+    // Number(0) || 0 = 0 — correct, not lost
+    expect(result.strength).toBe(0);
+  });
+
+  it("calls LLM with correct temperature and maxTokens", async () => {
+    const llm = makeLLM(llmAnalysis());
+    await analyzeTextWithAI("text", llm);
+    const call = (llm.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.temperature).toBe(0.7);
+    expect(call.maxTokens).toBe(500);
+  });
+
+  it("LLM prompt contains the input text", async () => {
+    const llm = makeLLM(llmAnalysis());
+    await analyzeTextWithAI("unique input xyz", llm);
+    const call = (llm.complete as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.userPrompt).toContain("unique input xyz");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// proccessAndStore
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("proccessAndStore", () => {
+  const TEXT = "I learned that Python is fast";
+  const USER = "user-42";
+
+  // ─── Happy path ────────────────────────────────────────────────────────────
+
+  it("returns the created entry", async () => {
+    const entry = makeEntry("new-id");
+    const storage = makeStorage(entry);
+    const result = await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage);
+    expect(result._id.toString()).toBe("new-id");
+  });
+
+  it("calls createEntry with correct userId and text", async () => {
+    const storage = makeStorage();
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage);
+    expect(storage.createEntry).toHaveBeenCalledWith(USER, TEXT, expect.any(Object));
+  });
+
+  it("passes analysis result from LLM to createEntry", async () => {
+    const storage = makeStorage();
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis({ summary: "custom summary" })), storage);
+    const analysis = (storage.createEntry as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(analysis.summary).toBe("custom summary");
+    expect(analysis.isProcessed).toBe(true);
+  });
+
+  // ─── Without embedding ────────────────────────────────────────────────────
+
+  it("does not call updateEntryEmbedding when no embedding adapter", async () => {
+    const storage = makeStorage();
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage);
+    expect(storage.updateEntryEmbedding).not.toHaveBeenCalled();
+  });
+
+  // ─── With embedding ───────────────────────────────────────────────────────
+
+  it("calls embed with original text", async () => {
+    const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
+    const embeddingAdapter: IEmbeddingAdapter = { embed };
+    const storage = makeStorage();
+
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(embed).toHaveBeenCalledWith(TEXT);
+  });
+
+  it("calls updateEntryEmbedding with entry._id.toString() and vector", async () => {
+    const vector = [0.1, 0.5, 0.9];
+    const entry = makeEntry("specific-id");
+    const storage = makeStorage(entry);
+    const embeddingAdapter: IEmbeddingAdapter = { embed: vi.fn().mockResolvedValue(vector) };
+
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(storage.updateEntryEmbedding).toHaveBeenCalledWith("specific-id", vector);
+  });
+
+  it("embedding is called after createEntry (needs entry._id)", async () => {
+    const callOrder: string[] = [];
+    const storage = makeStorage();
+    (storage.createEntry as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      callOrder.push("createEntry");
+      return makeEntry();
+    });
+    const embeddingAdapter: IEmbeddingAdapter = {
+      embed: vi.fn().mockImplementation(async () => {
+        callOrder.push("embed");
+        return [0.1];
+      }),
+    };
+
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(callOrder.indexOf("createEntry")).toBeLessThan(callOrder.indexOf("embed"));
+  });
+
+  // ─── Embedding error is non-fatal ─────────────────────────────────────────
+
+  it("returns entry even when embed() throws", async () => {
+    const entry = makeEntry("safe-id");
+    const storage = makeStorage(entry);
+    const embeddingAdapter: IEmbeddingAdapter = {
+      embed: vi.fn().mockRejectedValue(new Error("GPU out of memory")),
+    };
+
+    const result = await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(result._id.toString()).toBe("safe-id");
+  });
+
+  it("does not call updateEntryEmbedding when embed() throws", async () => {
+    const storage = makeStorage();
+    const embeddingAdapter: IEmbeddingAdapter = {
+      embed: vi.fn().mockRejectedValue(new Error("timeout")),
+    };
+
+    await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(storage.updateEntryEmbedding).not.toHaveBeenCalled();
+  });
+
+  it("returns entry even when updateEntryEmbedding() throws", async () => {
+    const entry = makeEntry("safe-id");
+    const storage = makeStorage(entry);
+    (storage.updateEntryEmbedding as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("write failed"));
+    const embeddingAdapter: IEmbeddingAdapter = { embed: vi.fn().mockResolvedValue([0.1]) };
+
+    const result = await proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage, embeddingAdapter);
+    expect(result._id.toString()).toBe("safe-id");
+  });
+
+  // ─── LLM / storage errors propagate ──────────────────────────────────────
+
+  it("propagates LLM error (analysis is fatal, unlike embedding)", async () => {
+    const storage = makeStorage();
+    await expect(
+      proccessAndStore(USER, TEXT, makeLLMError(), storage)
+    ).rejects.toThrow("LLM timeout");
+    expect(storage.createEntry).not.toHaveBeenCalled();
+  });
+
+  it("propagates createEntry error", async () => {
+    const storage = makeStorage();
+    (storage.createEntry as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB full"));
+    await expect(
+      proccessAndStore(USER, TEXT, makeLLM(llmAnalysis()), storage)
+    ).rejects.toThrow("DB full");
+  });
+
+  // ─── FALLBACK analysis is still stored ───────────────────────────────────
+
+  it("stores FALLBACK analysis when LLM returns null", async () => {
+    const storage = makeStorage();
+    await proccessAndStore(USER, TEXT, makeLLM(null), storage);
+    const analysis = (storage.createEntry as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(analysis.isProcessed).toBe(false);
+    expect(analysis.tags).toEqual(["unprocessed"]);
+  });
+});

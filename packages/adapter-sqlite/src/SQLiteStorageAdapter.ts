@@ -371,6 +371,7 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
       ON CONFLICT DO NOTHING
     `);
     for (const s of synapses) {
+      if (s.sourceId === s.targetId) continue;
       if (!deltaEntryIds.has(s.sourceId) && !deltaEntryIds.has(s.targetId)) continue;
       upsert.run(uid(), s.sourceId, s.targetId, s.strength, s.reason, now);
       created++;

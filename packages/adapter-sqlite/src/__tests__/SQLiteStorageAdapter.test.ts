@@ -512,3 +512,44 @@ describe("countEntries", () => {
     expect(await s.countEntries()).toBe(1);
   });
 });
+
+// ─── Self-referencing synapse ─────────────────────────────────────────────────
+
+describe("processSynapseLinks — self-referencing synapse", () => {
+  it("does not create synapse where sourceId === targetId", async () => {
+    const s = makeAdapter();
+    const e = await s.createEntry("user-1", "entry", makeAnalysis());
+    const id = e._id.toString();
+    const deltaIds = new Set([id]);
+
+    const created = await s.processSynapseLinks([{
+      sourceId: id,
+      targetId: id,
+      reason: "self loop",
+      strength: 0.9,
+    }], deltaIds);
+
+    expect(created).toBe(0);
+    const synapses = await s.getSynapsesBySource(id, 10);
+    expect(synapses).toHaveLength(0);
+  });
+
+  it("skips self-reference but still creates valid synapses in same batch", async () => {
+    const s = makeAdapter();
+    const e1 = await s.createEntry("user-1", "A", makeAnalysis());
+    const e2 = await s.createEntry("user-1", "B", makeAnalysis());
+    const id1 = e1._id.toString();
+    const id2 = e2._id.toString();
+    const deltaIds = new Set([id1, id2]);
+
+    const created = await s.processSynapseLinks([
+      { sourceId: id1, targetId: id1, reason: "self", strength: 0.9 }, // skipped
+      { sourceId: id1, targetId: id2, reason: "valid", strength: 0.8 }, // kept
+    ], deltaIds);
+
+    expect(created).toBe(1);
+    const synapses = await s.getSynapsesBySource(id1, 10);
+    expect(synapses).toHaveLength(1);
+    expect(synapses[0].targetId).toBe(id2);
+  });
+});

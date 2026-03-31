@@ -25,7 +25,7 @@ export async function getSynapticTree(
   visited: Set<string> = new Set(),
   currentLevel = 1
 ): Promise<SynapseNode[]> {
-  if (depth > MEMORY.SYNAPSE_TREE_DEPTH || visited.has(startEntryId)) return [];
+  if (depth <= 0 || visited.has(startEntryId)) return [];
 
   visited.add(startEntryId);
 
@@ -118,7 +118,7 @@ export async function getBrainContext(
 
     for (const entry of entries) {
       const entryId = entry._id.toString();
-      const summary = entry.analysis?.summary || entry.rawText.substring(0, 60);
+      const summary = entry.analysis?.summary || entry.rawText.substring(0, MEMORY.RAW_TEXT_PREVIEW_LENGTH);
 
       synapticTreeFormatted += `📍 START: "${summary}"\n`;
 
