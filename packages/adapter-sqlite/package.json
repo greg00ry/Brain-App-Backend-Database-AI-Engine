@@ -13,7 +13,8 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@the-brain/core": "*"
@@ -21,7 +22,8 @@
   "devDependencies": {
     "@the-brain/core": "*",
     "@types/node": "^22.0.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.2"
   },
   "engines": {
     "node": ">=22.5.0"

@@ -21,16 +21,17 @@ The Brain is infrastructure. It defines **how a local AI agent should work** —
 ## Quick Start
 
 ```bash
-npm install @the-brain/core @the-brain/adapter-files
+npm install @the-brain/core @the-brain/adapter-sqlite
+ollama pull llama3.2 && ollama pull nomic-embed-text
 ```
 
 ```typescript
 import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
-import { FileStorageAdapter } from "@the-brain/adapter-files";
+import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
 
 const brain = new Brain(
   new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3.2"),
-  new FileStorageAdapter("./.brain"),
+  new SQLiteStorageAdapter("./.brain"),
   new OpenAICompatibleEmbeddingAdapter("http://localhost:11434/v1/embeddings", "nomic-embed-text"),
 );
 
@@ -40,9 +41,9 @@ const result = await brain.process("user-1", "I prefer functional programming");
 console.log(result.answer);
 ```
 
-Zero config. No MongoDB. No cloud. Works with Ollama.
+Zero config. Single file (`brain.db`). No server. Works with Ollama. Requires Node.js >= 22.5.
 
-> **Note:** Embeddings require `nomic-embed-text` in Ollama (`ollama pull nomic-embed-text`). Without them, recall falls back to keyword search. For full Graph RAG and synapses, use `@the-brain/adapter-mongo`.
+> **Note:** `nomic-embed-text` enables semantic search. Without it, recall falls back to keyword search. For Graph RAG and synapses, use `@the-brain/adapter-mongo`.
 
 ---
 
@@ -51,8 +52,9 @@ Zero config. No MongoDB. No cloud. Works with Ollama.
 | Package | Description | npm |
 |---|---|---|
 | `@the-brain/core` | Core framework — Brain class, intent routing, memory, adapters | [![npm](https://img.shields.io/npm/v/@the-brain/core)](https://www.npmjs.com/package/@the-brain/core) |
-| `@the-brain/adapter-mongo` | MongoDB storage adapter (enables Graph RAG, synapses) | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-mongo)](https://www.npmjs.com/package/@the-brain/adapter-mongo) |
-| `@the-brain/adapter-files` | File-based storage adapter (zero config, no DB needed) | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-files)](https://www.npmjs.com/package/@the-brain/adapter-files) |
+| `@the-brain/adapter-sqlite` | SQLite storage — recommended default, semantic search, single file | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-sqlite)](https://www.npmjs.com/package/@the-brain/adapter-sqlite) |
+| `@the-brain/adapter-mongo` | MongoDB storage — full features: Graph RAG, synapses, vector search | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-mongo)](https://www.npmjs.com/package/@the-brain/adapter-mongo) |
+| `@the-brain/adapter-files` | File-based storage — prototyping only, no semantic search | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-files)](https://www.npmjs.com/package/@the-brain/adapter-files) |
 | `@the-brain/cli` | Interactive CLI — chat with your Brain from terminal | [![npm](https://img.shields.io/npm/v/@the-brain/cli)](https://www.npmjs.com/package/@the-brain/cli) |
 
 ---
@@ -150,17 +152,22 @@ new OpenAICompatibleAdapter("https://api.openai.com/v1/chat/completions", "gpt-4
 
 ## Storage Adapters
 
-| Adapter | Setup | Features |
-|---|---|---|
-| `FileStorageAdapter` | Zero config | Basic memory, keyword search, chat history |
-| `MongoStorageAdapter` | MongoDB required | + Graph RAG, synapses, semantic search, consolidation |
+| Adapter | Setup | Semantic search | Graph RAG | Synapses |
+|---|---|---|---|---|
+| `SQLiteStorageAdapter` | Zero config, single file | ✅ cosine similarity | ❌ | ❌ |
+| `FileStorageAdapter` | Zero config, JSON files | ❌ keyword only | ❌ | ❌ |
+| `MongoStorageAdapter` | MongoDB required | ✅ vector search | ✅ | ✅ |
 
 ```typescript
-// Zero config
+// SQLite — recommended default (Node >= 22.5)
+import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
+new SQLiteStorageAdapter("./.brain")
+
+// Files — prototyping only, no semantic search
 import { FileStorageAdapter } from "@the-brain/adapter-files";
 new FileStorageAdapter("./.brain")
 
-// Full features
+// MongoDB — full features
 import { MongoStorageAdapter } from "@the-brain/adapter-mongo";
 new MongoStorageAdapter() // reads MONGODB_URI from env
 ```
@@ -226,6 +233,51 @@ See [`example-app/`](./example-app) for a minimal working example:
 - Custom `TRADING_SIGNAL` action
 - Ollama as LLM backend
 - 40 lines of code
+
+---
+
+## Memory Lifecycle
+
+The Brain mimics biological memory — entries decay over time and get pruned when they fade completely.
+
+### Automatic maintenance
+
+Maintenance runs automatically **every 5 saves** (fire-and-forget, non-blocking):
+
+```
+Save #1, #2, #3, #4 → nothing
+Save #5             → maintenance triggers in background
+Save #6, #7, #8, #9 → nothing
+Save #10            → maintenance triggers again
+```
+
+You can also trigger it manually:
+
+```typescript
+const { subStats, consciousStats } = await brain.runMaintenance();
+// subStats:      { decayed, pruned, readyForLTM }
+// consciousStats: { synapsesCreated, consolidated }
+```
+
+### Subconscious routine (pure math, no LLM)
+
+1. **Decay** — entries inactive for 24h lose 1 strength point
+2. **Pruning** — entries at strength 0 are deleted (along with their synapses)
+3. **Mark** — entries at strength ≥ 10 are flagged for consolidation
+
+### Conscious processor (LLM-driven)
+
+1. **Synapse creation** — new entries get connected to related existing entries
+2. **Consolidation** — strong entries (strength ≥ 10) are summarised into long-term memory
+
+### Strength scale
+
+```
+strength 10 → slow decay, stays months → gets consolidated to LTM
+strength 5  → medium decay
+strength 1  → pruned within days
+strength 0  → deleted on next maintenance run
+```
 
 ---
 

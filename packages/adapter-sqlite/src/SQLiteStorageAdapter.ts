@@ -92,7 +92,8 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
         targetId  TEXT NOT NULL,
         weight    REAL DEFAULT 1,
         reason    TEXT DEFAULT '',
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        UNIQUE(sourceId, targetId)
       );
 
       CREATE TABLE IF NOT EXISTS long_term_memories (
