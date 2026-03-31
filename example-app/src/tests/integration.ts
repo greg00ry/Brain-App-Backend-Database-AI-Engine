@@ -1,5 +1,5 @@
 import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
-import { FileStorageAdapter } from "@the-brain/adapter-files";
+import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -22,7 +22,7 @@ const embedding = new OpenAICompatibleEmbeddingAdapter(
   "nomic-embed-text",
 );
 
-const storage = new FileStorageAdapter(STORAGE_DIR);
+const storage = new SQLiteStorageAdapter(STORAGE_DIR);
 const brain = new Brain(llm, storage, embedding);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

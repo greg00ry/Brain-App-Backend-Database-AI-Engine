@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@the-brain/core": "^0.1.0",
-    "@the-brain/adapter-files": "^0.1.0"
+    "@the-brain/adapter-sqlite": "^0.1.0"
   },
   "devDependencies": {
     "tsx": "^4.16.0",

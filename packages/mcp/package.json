@@ -17,11 +17,11 @@
   },
   "peerDependencies": {
     "@the-brain/core": "*",
-    "@the-brain/adapter-files": "*"
+    "@the-brain/adapter-sqlite": "*"
   },
   "devDependencies": {
     "@the-brain/core": "*",
-    "@the-brain/adapter-files": "*",
+    "@the-brain/adapter-sqlite": "*",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
     "@types/node": "^22.0.0"

@@ -4,7 +4,7 @@
 // @the-brain/mcp — MCP server
 //
 // Plugs The Brain into Claude Code, Cursor, and Cline as a persistent memory layer.
-// Runs as a stdio server. Zero config — defaults to FileStorageAdapter + Ollama.
+// Runs as a stdio server. Zero config — defaults to SQLiteStorageAdapter + Ollama.
 //
 // Config via env vars:
 //   BRAIN_LLM_URL      LLM endpoint   (default: http://localhost:11434/v1/chat/completions)
@@ -21,7 +21,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Brain, OpenAICompatibleAdapter } from "@the-brain/core";
-import { FileStorageAdapter } from "@the-brain/adapter-files";
+import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -37,7 +37,7 @@ const STORAGE_PATH = process.env.BRAIN_STORAGE_PATH ?? join(homedir(), ".brain")
 
 const brain = new Brain(
   new OpenAICompatibleAdapter(LLM_URL, LLM_MODEL, LLM_API_KEY),
-  new FileStorageAdapter(STORAGE_PATH),
+  new SQLiteStorageAdapter(STORAGE_PATH),
 );
 
 // ─── Server ───────────────────────────────────────────────────────────────────
