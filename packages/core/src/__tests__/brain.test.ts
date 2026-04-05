@@ -20,6 +20,8 @@ function makeMockStorage(): IStorageAdapter {
     upsertAction: vi.fn().mockResolvedValue(undefined),
     getChatHistory: vi.fn().mockResolvedValue([]),
     appendChatMessage: vi.fn().mockResolvedValue(undefined),
+    getUserProfile: vi.fn().mockResolvedValue(null),
+    upsertUserProfile: vi.fn().mockResolvedValue(undefined),
     findRelevantEntries: vi.fn().mockResolvedValue([]),
     findSimilarEntries: vi.fn().mockResolvedValue([]),
     updateEntryEmbedding: vi.fn().mockResolvedValue(undefined),

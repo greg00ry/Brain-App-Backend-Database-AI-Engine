@@ -9,6 +9,7 @@ import { runConsciousProcessor } from "./services/brain/conscious.processor.js";
 import { RESEARCH_ANSWER_PROMPT } from "./services/ai/prompts/research-answer.prompt.js";
 import { SAVE_RESPONSE_PROMPT } from "./services/ai/prompts/save-response.prompt.js";
 import { PERSONALITY_SYSTEM_PROMPT } from "./services/ai/prompts/personality.prompt.js";
+import { USER_PROFILE_PROMPT, buildSystemPrompt } from "./services/ai/prompts/user-profile.prompt.js";
 import { LLM, CHAT } from "./config/constants.js";
 
 export type ActionHandler = (
@@ -36,19 +37,23 @@ export class Brain {
   private actionsCache: ActionInfo[] = [];
   private handlers = new Map<string, ActionHandler>();
   private saveCount = 0;
+  private conversationCount = 0;
 
   constructor(
     private readonly llm: ILLMAdapter,
     private readonly storage: IStorageAdapter,
     private readonly embedding?: IEmbeddingAdapter,
   ) {
-    this.handlers.set("RESEARCH_BRAIN", async (_userId, text, { synapticTree, hasContext }, _llm, chatHistory) => {
+    this.handlers.set("RESEARCH_BRAIN", async (userId, text, { synapticTree, hasContext }, _llm, chatHistory) => {
+      const userProfile = await this.storage.getUserProfile(userId);
+      const systemPrompt = buildSystemPrompt(PERSONALITY_SYSTEM_PROMPT, userProfile);
+
       const prompt = hasContext
         ? RESEARCH_ANSWER_PROMPT(text, synapticTree, chatHistory)
         : `The user asked: "${text}"\n\nYou don't have anything stored about this yet. Let them know and ask if they want to tell you more.`;
 
       const answer = await this.llm.complete({
-        systemPrompt: PERSONALITY_SYSTEM_PROMPT,
+        systemPrompt,
         userPrompt: prompt,
         temperature: LLM.RESPONSE_TEMPERATURE,
         maxTokens: LLM.RESPONSE_MAX_TOKENS,
@@ -56,9 +61,12 @@ export class Brain {
       return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
 
-    this.handlers.set("SAVE_ONLY", async (_userId, text, _context, _llm, chatHistory) => {
+    this.handlers.set("SAVE_ONLY", async (userId, text, _context, _llm, chatHistory) => {
+      const userProfile = await this.storage.getUserProfile(userId);
+      const systemPrompt = buildSystemPrompt(PERSONALITY_SYSTEM_PROMPT, userProfile);
+
       const answer = await this.llm.complete({
-        systemPrompt: PERSONALITY_SYSTEM_PROMPT,
+        systemPrompt,
         userPrompt: SAVE_RESPONSE_PROMPT(text, chatHistory),
         temperature: LLM.SAVE_TEMPERATURE,
         maxTokens: LLM.SAVE_MAX_TOKENS,
@@ -116,6 +124,14 @@ export class Brain {
       await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
       await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
 
+      // Update user profile every N conversations (fire and forget)
+      this.conversationCount++;
+      if (this.conversationCount % CHAT.PROFILE_UPDATE_EVERY_N === 0) {
+        this.updateUserProfile(userId, chatHistory).catch(err =>
+          console.error('[Brain] Profile update error:', err)
+        );
+      }
+
       return { action: "SAVE_ONLY", answer, entryId: entry._id };
     }
 
@@ -124,7 +140,39 @@ export class Brain {
     await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
     await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
 
+    // Update user profile every N conversations (fire and forget)
+    this.conversationCount++;
+    if (this.conversationCount % CHAT.PROFILE_UPDATE_EVERY_N === 0) {
+      this.updateUserProfile(userId, chatHistory).catch(err =>
+        console.error('[Brain] Profile update error:', err)
+      );
+    }
+
     return { action: intent.action, answer };
+  }
+
+  // ─── Profile ──────────────────────────────────────────────────────────────
+
+  private async updateUserProfile(userId: string, chatHistory: { role: string; content: string }[]): Promise<void> {
+    if (chatHistory.length === 0) return;
+
+    const sample = chatHistory
+      .slice(-CHAT.HISTORY_MAX_STORED)
+      .map(m => `${m.role === 'user' ? 'User' : 'Brain'}: ${m.content}`)
+      .join('\n');
+
+    const existingProfile = await this.storage.getUserProfile(userId);
+    const prompt = USER_PROFILE_PROMPT(sample, existingProfile);
+
+    const profile = await this.llm.complete({
+      userPrompt: prompt,
+      temperature: 0.3,
+      maxTokens: 300,
+    });
+
+    if (profile) {
+      await this.storage.upsertUserProfile(userId, profile);
+    }
   }
 
   async recall(userId: string, text: string) {

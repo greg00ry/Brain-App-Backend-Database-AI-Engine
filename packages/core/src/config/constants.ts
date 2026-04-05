@@ -89,6 +89,7 @@ export const CHAT = {
   HISTORY_RECENT_FOR_PROMPT: 3,    // messages included in prompt
   HISTORY_MAX_STORED: 10,          // sliding window in DB
   MAINTENANCE_EVERY_N: 20,         // trigger maintenance every N saves
+  PROFILE_UPDATE_EVERY_N: 10,      // update user profile every N conversations
 } as const;
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────

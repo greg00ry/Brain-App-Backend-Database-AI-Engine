@@ -129,6 +129,12 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
         description TEXT DEFAULT '',
         keywords    TEXT DEFAULT '[]'
       );
+
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        userId    TEXT PRIMARY KEY,
+        profile   TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
     `);
   }
 
@@ -245,6 +251,21 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
       INSERT INTO chat_history (userId, messages, updatedAt) VALUES (?, ?, ?)
       ON CONFLICT(userId) DO UPDATE SET messages = excluded.messages, updatedAt = excluded.updatedAt
     `).run(userId, JSON.stringify(trimmed), now);
+  }
+
+  // ─── User Profile ─────────────────────────────────────────────────────────
+
+  async getUserProfile(userId: string): Promise<string | null> {
+    const row = this.db.prepare("SELECT profile FROM user_profiles WHERE userId = ?").get(userId) as { profile: string } | undefined;
+    return row?.profile ?? null;
+  }
+
+  async upsertUserProfile(userId: string, profile: string): Promise<void> {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO user_profiles (userId, profile, updatedAt) VALUES (?, ?, ?)
+      ON CONFLICT(userId) DO UPDATE SET profile = excluded.profile, updatedAt = excluded.updatedAt
+    `).run(userId, profile, now);
   }
 
   // ─── Intent Context ───────────────────────────────────────────────────────

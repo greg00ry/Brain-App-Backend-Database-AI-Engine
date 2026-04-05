@@ -18,6 +18,7 @@ import { LongTermMemory } from "./models/LongTermMemory.js";
 import { Synapse } from "./models/Synapse.js";
 import { Action } from "./models/Action.js";
 import { ChatHistory } from "./models/ChatHistory.js";
+import { UserProfile } from "./models/UserProfile.js";
 import { BRAIN, MEMORY } from "@the-brain/core";
 
 // ─── Synapse helpers ──────────────────────────────────────────────────────────
@@ -146,6 +147,19 @@ export class MongoStorageAdapter implements IStorageAdapter {
         $push: { messages: { $each: [{ role, content }], $slice: -maxMessages } },
         $set: { updatedAt: new Date() },
       },
+      { upsert: true }
+    );
+  }
+
+  async getUserProfile(userId: string): Promise<string | null> {
+    const doc = await UserProfile.findOne({ userId });
+    return doc?.profile ?? null;
+  }
+
+  async upsertUserProfile(userId: string, profile: string): Promise<void> {
+    await UserProfile.findOneAndUpdate(
+      { userId },
+      { profile, updatedAt: new Date() },
       { upsert: true }
     );
   }
