@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chunkText } from "../index.js";
+import { chunkText } from "../ingest.js";
 
 describe("chunkText", () => {
   it("splits text into chunks of given size", () => {
