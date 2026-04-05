@@ -358,3 +358,51 @@ describe("LLM response format edge cases", () => {
     expect(result.action).toBe("SAVE_ONLY");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Structural routing: question + SAVE_ONLY → RESEARCH_BRAIN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Structural routing: question redirected from SAVE_ONLY to RESEARCH_BRAIN", () => {
+  it("LLM SAVE_ONLY for a question → overridden to RESEARCH_BRAIN", async () => {
+    const llm = makeLLM(llmJson("SAVE_ONLY", 85));
+    const result = await classifyIntent({ userText: "Co sądzisz o multi-query recall?", actions: ACTIONS }, llm);
+    expect(result.action).toBe("RESEARCH_BRAIN");
+    expect(result.source).toBe("rule");
+  });
+
+  it("LLM SAVE_ONLY for a question → confidence is 88", async () => {
+    const llm = makeLLM(llmJson("SAVE_ONLY", 90));
+    const result = await classifyIntent({ userText: "What do you think about this approach?", actions: ACTIONS }, llm);
+    expect(result.confidence).toBe(88);
+  });
+
+  it("LLM TRADING_SIGNAL for a question → NOT overridden (custom action preserved)", async () => {
+    const llm = makeLLM(llmJson("TRADING_SIGNAL", 85));
+    const result = await classifyIntent({ userText: "what's the signal for BTC?", actions: ACTIONS_WITH_CUSTOM }, llm);
+    expect(result.action).toBe("TRADING_SIGNAL");
+    expect(result.source).toBe("llm");
+  });
+
+  it("LLM SAVE_ONLY for non-question → NOT overridden", async () => {
+    const llm = makeLLM(llmJson("SAVE_ONLY", 85));
+    const result = await classifyIntent({ userText: "I think Python is great", actions: ACTIONS }, llm);
+    expect(result.action).toBe("SAVE_ONLY");
+    expect(result.source).toBe("llm");
+  });
+
+  it("explicit save command with '?' still routes to SAVE_ONLY (rule wins before LLM)", async () => {
+    const llm = makeLLM(llmJson("RESEARCH_BRAIN", 95));
+    const result = await classifyIntent({ userText: "zapamiętaj: co to jest?", actions: ACTIONS }, llm);
+    expect(result.action).toBe("SAVE_ONLY");
+    expect(result.source).toBe("rule");
+    expect(llm.complete).not.toHaveBeenCalled();
+  });
+
+  it("LLM SAVE_ONLY with low confidence + question → rule fallback already handles it via RESEARCH_BRAIN", async () => {
+    const llm = makeLLM(llmJson("SAVE_ONLY", 50));
+    const result = await classifyIntent({ userText: "Jakie mam notatki?", actions: ACTIONS }, llm);
+    // "Jakie mam notatki?" matches the memory-keywords rule (78%) as fallback
+    expect(result.action).toBe("RESEARCH_BRAIN");
+  });
+});

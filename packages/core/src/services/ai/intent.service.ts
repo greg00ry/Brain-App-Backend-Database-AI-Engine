@@ -103,6 +103,16 @@ export async function classifyIntent(
 
     // Step 3: LLM confidence high enough — trust it
     if (llmResult && llmResult.confidence >= ROUTING.LLM_MIN_CONFIDENCE) {
+      // Structural routing: if LLM classified a question as SAVE_ONLY, redirect to RESEARCH_BRAIN.
+      // Custom actions (e.g. TRADING_SIGNAL) are preserved — only SAVE_ONLY is overridden.
+      if (llmResult.action === "SAVE_ONLY" && /\?/.test(userText) && validActions.has("RESEARCH_BRAIN")) {
+        return {
+          action: "RESEARCH_BRAIN",
+          reasoning: "Structural routing: question redirected from SAVE_ONLY",
+          confidence: 88,
+          source: "rule",
+        };
+      }
       return llmResult;
     }
 
