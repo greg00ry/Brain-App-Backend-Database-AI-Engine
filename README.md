@@ -1,20 +1,24 @@
 # The Brain
 
-> **Privacy-first AI framework for cognitive memory and intent routing**
+> **LLM-agnostic cognitive memory framework**
 
 [![CI](https://github.com/greg00ry/the-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/greg00ry/the-brain/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/greg00ry/the-brain)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 ---
 
 ## What Is This?
 
-Most AI projects are wrappers — a React UI calling OpenAI API. That's a product, not infrastructure.
+Infrastructure for building AI agents with memory — not a wrapper around an API, not a chatbot template.
 
-The Brain is infrastructure. It defines **how a local AI agent should work** — not which model to use, not which database, not which UI. The paradigm, not the implementation.
+**The core insight:** AI models work better when you design the environment around them. Good context, relevant memory, clear action boundaries — these make a weak local model competitive with cloud.
 
-**The core insight:** AI models work better when you design the environment for the model, not just for the developer. Good context, relevant memory, clear action boundaries — these make a weak local model competitive with cloud.
+The Brain provides:
+- **Hybrid intent routing** — rules + LLM + confidence scoring, works reliably with local or cloud
+- **Biologically-inspired memory** — strength-based decay, synapses, Graph RAG, long-term consolidation
+- **Dynamic action registry** — extensible, DB-backed, build any agent on top
+- **User profile adaptation** — Brain learns your communication style over time
+- **LLM agnostic** — any OpenAI-compatible endpoint, local or cloud
 
 ---
 
@@ -22,28 +26,31 @@ The Brain is infrastructure. It defines **how a local AI agent should work** —
 
 ```bash
 npm install @the-brain/core @the-brain/adapter-sqlite
-ollama pull llama3.2 && ollama pull nomic-embed-text
 ```
 
 ```typescript
-import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
+import { Brain, OpenAICompatibleAdapter } from "@the-brain/core";
 import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
 
 const brain = new Brain(
-  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3.2"),
-  new SQLiteStorageAdapter("./.brain"),
-  new OpenAICompatibleEmbeddingAdapter("http://localhost:11434/v1/embeddings", "nomic-embed-text"),
+  new OpenAICompatibleAdapter(
+    "http://localhost:11434/v1/chat/completions", // Ollama, LM Studio, Groq, OpenAI — anything OpenAI-compatible
+    "llama3.2"
+  ),
+  new SQLiteStorageAdapter("./.brain")
 );
 
 await brain.loadActions();
 
-const result = await brain.process("user-1", "I prefer functional programming");
+// Save a fact
+await brain.save("user-1", "I prefer functional programming");
+
+// Ask a question — Brain routes intent and searches memory
+const result = await brain.process("user-1", "What do I prefer for coding?");
 console.log(result.answer);
 ```
 
-Zero config. Single file (`brain.db`). No server. Works with Ollama. Requires Node.js >= 22.5.
-
-> **Note:** `nomic-embed-text` enables semantic search. Without it, recall falls back to keyword search. For Graph RAG and synapses, use `@the-brain/adapter-mongo`.
+Zero config. Single file (`brain.db`). No server. Requires Node.js >= 22.5.
 
 ---
 
@@ -51,40 +58,42 @@ Zero config. Single file (`brain.db`). No server. Works with Ollama. Requires No
 
 | Package | Description | npm |
 |---|---|---|
-| `@the-brain/core` | Core framework — Brain class, intent routing, memory, adapters | [![npm](https://img.shields.io/npm/v/@the-brain/core)](https://www.npmjs.com/package/@the-brain/core) |
-| `@the-brain/adapter-sqlite` | SQLite storage — recommended default, semantic search, single file | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-sqlite)](https://www.npmjs.com/package/@the-brain/adapter-sqlite) |
-| `@the-brain/adapter-mongo` | MongoDB storage — full features: Graph RAG, synapses, vector search | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-mongo)](https://www.npmjs.com/package/@the-brain/adapter-mongo) |
-| `@the-brain/adapter-files` | File-based storage — prototyping only, no semantic search | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-files)](https://www.npmjs.com/package/@the-brain/adapter-files) |
-| `@the-brain/cli` | Interactive CLI — chat with your Brain from terminal | [![npm](https://img.shields.io/npm/v/@the-brain/cli)](https://www.npmjs.com/package/@the-brain/cli) |
+| `@the-brain/core` | Core framework — Brain class, intent routing, memory | [![npm](https://img.shields.io/npm/v/@the-brain/core)](https://www.npmjs.com/package/@the-brain/core) |
+| `@the-brain/adapter-sqlite` | SQLite storage — zero-config, single file (Node >= 22.5) | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-sqlite)](https://www.npmjs.com/package/@the-brain/adapter-sqlite) |
+| `@the-brain/adapter-mongo` | MongoDB storage — full Graph RAG, synapses, multi-user | [![npm](https://img.shields.io/npm/v/@the-brain/adapter-mongo)](https://www.npmjs.com/package/@the-brain/adapter-mongo) |
+| `@the-brain/cli` | CLI — chat, save, recall, ingest PDFs, maintenance | [![npm](https://img.shields.io/npm/v/@the-brain/cli)](https://www.npmjs.com/package/@the-brain/cli) |
 
 ---
 
-## What Makes This Different
+## Works With Any LLM
 
-### 1. Hybrid Intent Routing
-Rules + LLM + confidence scoring. High-confidence rules skip LLM entirely. LLM handles ambiguous cases. Deterministic fallback always present.
+```typescript
+// Local — Ollama
+new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3.2")
 
+// Local — LM Studio
+new OpenAICompatibleAdapter("http://localhost:1234/v1/chat/completions", "local-model")
+
+// Groq (free, fast, no GPU needed)
+new OpenAICompatibleAdapter(
+  "https://api.groq.com/openai/v1/chat/completions",
+  "llama-3.3-70b-versatile",
+  process.env.GROQ_API_KEY
+)
+
+// OpenAI
+new OpenAICompatibleAdapter(
+  "https://api.openai.com/v1/chat/completions",
+  "gpt-4o",
+  process.env.OPENAI_API_KEY
+)
 ```
-Rule engine (instant) → high confidence → done
-                      → low confidence → LLM
-                                       → high confidence → done
-                                       → low confidence → rule fallback
-                                                        → default
-```
 
-Result: 95% accuracy with local OR cloud LLM.
+---
 
-### 2. Biologically-Inspired Memory
-Not just a vector database. Actual forgetting mechanism.
+## Custom Actions
 
-- **Strength-based decay** — entries lose strength over time, important stays, trivial fades
-- **Subconscious routine** — pure math, deterministic pruning, no LLM needed
-- **Conscious consolidation** — AI-driven, strong memories → long-term
-- **Graph RAG** — synaptic connections between entries, not just similarity search
-- **Semantic search** — embeddings via any OpenAI-compatible API
-
-### 3. Dynamic Action Registry
-Actions stored in DB, not hardcoded. Add a new action without editing prompts.
+Build any agent on top of the framework:
 
 ```typescript
 await brain.registerAction(
@@ -93,29 +102,98 @@ await brain.registerAction(
   async (userId, text, { synapticTree, hasContext }, llm) => {
     const context = hasContext ? `\nRelevant memory:\n${synapticTree}` : "";
     const answer = await llm.complete({
-      userPrompt: `Analyze trading signal: "${text}"${context}`,
+      userPrompt: `Analyze: "${text}"${context}`,
       temperature: 0.3,
-      maxTokens: 200,
+      maxTokens: 300,
     });
     return answer ?? "Could not analyze.";
   }
 );
 ```
 
-Prompt rebuilds automatically from registered actions.
+Legal assistant, trading agent, medical notes, dev assistant — same framework, different actions and personality prompt.
 
-### 4. LLM Agnostic
-One adapter works with everything that speaks OpenAI-compatible API:
+---
+
+## Memory Lifecycle
+
+```
+Entry saved (strength=5)
+  │
+  ├── Conscious processor (LLM-driven, every N saves)
+  │     Analyzes entries → builds synapses → consolidates strong ones to LTM
+  │
+  └── Subconscious routine (pure math, no LLM)
+        Inactive entries lose strength → strength=0 → pruned
+        Dead synapses pruned
+        strength ≥ 10 → consolidated to long-term memory
+```
+
+Entries marked `isPermanent` never decay — use for ingested documents and critical knowledge.
+
+---
+
+## PDF Ingest
+
+Feed documents as permanent memory via the CLI:
+
+```bash
+brain ingest ./legal_docs/       # entire folder
+brain ingest ./manual.pdf        # single file
+brain ingest ./report.pdf --chunk-size 800 --overlap 150
+```
+
+Or programmatically:
 
 ```typescript
-// Ollama (local, recommended)
-new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3")
+await brain.save(userId, "[PDF: contract.pdf, chunk 1/42]\nArticle 1...", true); // isPermanent=true
+```
 
-// LM Studio (local)
-new OpenAICompatibleAdapter("http://localhost:1234/v1/chat/completions", "local-model")
+---
 
-// OpenAI (cloud)
-new OpenAICompatibleAdapter("https://api.openai.com/v1/chat/completions", "gpt-4o", apiKey)
+## MongoDB (Full Features)
+
+```bash
+npm install @the-brain/core @the-brain/adapter-mongo mongoose
+```
+
+```typescript
+import { MongoStorageAdapter, connectDB } from "@the-brain/adapter-mongo";
+
+await connectDB(); // reads MONGODB_URI from env
+
+const brain = new Brain(llm, new MongoStorageAdapter());
+```
+
+| Feature | SQLite | MongoDB |
+|---|---|---|
+| Zero config | ✅ | ❌ |
+| Synaptic graph traversal | ✅ | ✅ |
+| Semantic search (cosine) | ✅ | ✅ |
+| Multi-user at scale | ⚠️ | ✅ |
+
+---
+
+## CLI
+
+```bash
+npm install -g @the-brain/cli
+```
+
+```bash
+brain                          # interactive chat
+brain process "What do I know about Python?"
+brain save "I prefer tabs over spaces" --permanent
+brain recall "indentation"
+brain ingest ./docs/
+brain maintenance
+```
+
+Configure via `.env`:
+```bash
+LLM_API_URL=http://localhost:11434/v1/chat/completions
+LLM_MODEL=llama3.2
+MONGODB_URI=mongodb://localhost:27017/brain
 ```
 
 ---
@@ -130,7 +208,7 @@ new OpenAICompatibleAdapter("https://api.openai.com/v1/chat/completions", "gpt-4
 │  (rules → LLM → confidence → action)   │
 │                                         │
 │  Memory System                          │
-│  (decay, consolidation, Graph RAG)      │
+│  (decay, synapses, consolidation)       │
 │                                         │
 │  Action Registry                        │
 │  (dynamic, DB-backed, extensible)       │
@@ -141,184 +219,16 @@ new OpenAICompatibleAdapter("https://api.openai.com/v1/chat/completions", "gpt-4
   LLM      Storage    Embedding
  Adapter   Adapter    Adapter
     │          │          │
- Any OpenAI  Files /   Any OpenAI
- compatible  MongoDB /  compatible
-    API      SQLite *      API
-
-* coming soon
+ Any OpenAI  SQLite /  Any OpenAI
+ compatible  MongoDB   compatible
+    API                   API
 ```
 
 ---
 
-## Storage Adapters
+## License
 
-| Adapter | Setup | Semantic search | Graph RAG | Synapses |
-|---|---|---|---|---|
-| `SQLiteStorageAdapter` | Zero config, single file | ✅ cosine similarity | ❌ | ❌ |
-| `FileStorageAdapter` | Zero config, JSON files | ❌ keyword only | ❌ | ❌ |
-| `MongoStorageAdapter` | MongoDB required | ✅ vector search | ✅ | ✅ |
-
-```typescript
-// SQLite — recommended default (Node >= 22.5)
-import { SQLiteStorageAdapter } from "@the-brain/adapter-sqlite";
-new SQLiteStorageAdapter("./.brain")
-
-// Files — prototyping only, no semantic search
-import { FileStorageAdapter } from "@the-brain/adapter-files";
-new FileStorageAdapter("./.brain")
-
-// MongoDB — full features
-import { MongoStorageAdapter } from "@the-brain/adapter-mongo";
-new MongoStorageAdapter() // reads MONGODB_URI from env
-```
-
----
-
-## With MongoDB (Full Features)
-
-```bash
-npm install @the-brain/core @the-brain/adapter-mongo mongoose
-```
-
-```typescript
-import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
-import { MongoStorageAdapter, connectDB } from "@the-brain/adapter-mongo";
-
-await connectDB(); // MONGODB_URI env var
-
-const brain = new Brain(
-  new OpenAICompatibleAdapter("http://localhost:11434/v1/chat/completions", "llama3"),
-  new MongoStorageAdapter(),
-  new OpenAICompatibleEmbeddingAdapter("http://localhost:11434/v1/embeddings", "nomic-embed-text"),
-);
-
-await brain.loadActions();
-```
-
----
-
-## CLI
-
-```bash
-npm install -g @the-brain/cli
-```
-
-```bash
-# Interactive chat (default)
-brain
-
-# Single commands
-brain process "What do I know about TypeScript?"
-brain save "I prefer functional programming"
-brain recall "programming preferences"
-brain maintenance
-```
-
-Configure via `.env`:
-
-```bash
-MONGODB_URI=mongodb://localhost:27017/the-brain
-LLM_API_URL=http://localhost:11434/v1/chat/completions
-LLM_MODEL=llama3
-EMBEDDING_API_URL=http://localhost:11434/v1/embeddings
-EMBEDDING_MODEL=nomic-embed-text
-```
-
----
-
-## Example App
-
-See [`example-app/`](./example-app) for a minimal working example:
-- FileStorageAdapter (no MongoDB)
-- Custom `TRADING_SIGNAL` action
-- Ollama as LLM backend
-- 40 lines of code
-
----
-
-## Memory Lifecycle
-
-The Brain mimics biological memory — entries decay over time and get pruned when they fade completely.
-
-### Automatic maintenance
-
-Maintenance runs automatically **every 5 saves** (fire-and-forget, non-blocking):
-
-```
-Save #1, #2, #3, #4 → nothing
-Save #5             → maintenance triggers in background
-Save #6, #7, #8, #9 → nothing
-Save #10            → maintenance triggers again
-```
-
-You can also trigger it manually:
-
-```typescript
-const { subStats, consciousStats } = await brain.runMaintenance();
-// subStats:      { decayed, pruned, readyForLTM }
-// consciousStats: { synapsesCreated, consolidated }
-```
-
-### Subconscious routine (pure math, no LLM)
-
-1. **Decay** — entries inactive for 24h lose 1 strength point
-2. **Pruning** — entries at strength 0 are deleted (along with their synapses)
-3. **Mark** — entries at strength ≥ 10 are flagged for consolidation
-
-### Conscious processor (LLM-driven)
-
-1. **Synapse creation** — new entries get connected to related existing entries
-2. **Consolidation** — strong entries (strength ≥ 10) are summarised into long-term memory
-
-### Strength scale
-
-```
-strength 10 → slow decay, stays months → gets consolidated to LTM
-strength 5  → medium decay
-strength 1  → pruned within days
-strength 0  → deleted on next maintenance run
-```
-
----
-
-## Known Limitations
-
-- **Custom action handlers** — `registerAction` works but handlers don't survive restarts (re-register on startup)
-- **FileAdapter** — no Graph RAG, no synapses; semantic search requires embedding adapter
-- **No SQLite adapter** — coming next
-
----
-
-## Roadmap
-
-### Now
-- [x] `@the-brain/core` on npm
-- [x] `@the-brain/adapter-mongo` on npm
-- [x] `@the-brain/adapter-files` on npm
-- [x] `@the-brain/cli` on npm
-- [x] Hybrid intent routing (rules + LLM + confidence)
-- [x] Biologically-inspired memory (decay, consolidation, Graph RAG)
-- [x] Dynamic action registry
-- [x] Ollama-only setup (one local LLM service)
-- [x] 26 passing tests, CI on GitHub Actions
-
-### Next
-- [x] MCP server (`@the-brain/mcp`) — Claude Code / Cursor integration
-- [ ] Semantic search in FileStorageAdapter (cosine similarity without MongoDB)
-- [ ] SQLite adapter
-- [ ] Persistent action handlers
-- [ ] API documentation
-
-### Later
-- [ ] PostgreSQL adapter
-- [ ] Shell integration (`brain-do`, `brain-explain`)
-- [ ] Additional LLM adapters (Anthropic native, Gemini)
-
----
-
-## Why AGPL-3.0?
-
-Prevents corporate capture. Network copyleft means cloud services built on The Brain must share source. Aligns with the mission — this is infrastructure that should stay open.
+**AGPL-3.0** — prevents corporate capture. Network copyleft means cloud services built on The Brain must share source.
 
 ---
 
