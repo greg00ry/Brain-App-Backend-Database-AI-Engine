@@ -21,6 +21,14 @@ export const LLM = {
   ANALYSIS_TEMPERATURE: 0.1,
   ANALYSIS_MAX_TOKENS: 3000,
 
+  // Conversational response (RESEARCH_BRAIN handler)
+  RESPONSE_TEMPERATURE: 0.7,
+  RESPONSE_MAX_TOKENS: 1500,
+
+  // Save acknowledgement (SAVE_ONLY handler)
+  SAVE_TEMPERATURE: 0.8,
+  SAVE_MAX_TOKENS: 300,
+
   // LTM consolidation
   LTM_TEMPERATURE: 0.3,
   LTM_MAX_TOKENS: 800,

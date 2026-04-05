@@ -50,8 +50,8 @@ export class Brain {
       const answer = await this.llm.complete({
         systemPrompt: PERSONALITY_SYSTEM_PROMPT,
         userPrompt: prompt,
-        temperature: LLM.INTENT_TEMPERATURE,
-        maxTokens: LLM.INTENT_MAX_TOKENS,
+        temperature: LLM.RESPONSE_TEMPERATURE,
+        maxTokens: LLM.RESPONSE_MAX_TOKENS,
       });
       return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
@@ -60,8 +60,8 @@ export class Brain {
       const answer = await this.llm.complete({
         systemPrompt: PERSONALITY_SYSTEM_PROMPT,
         userPrompt: SAVE_RESPONSE_PROMPT(text, chatHistory),
-        temperature: 0.8,
-        maxTokens: 150,
+        temperature: LLM.SAVE_TEMPERATURE,
+        maxTokens: LLM.SAVE_MAX_TOKENS,
       });
       return answer ?? "Zapisałem to.";
     });
