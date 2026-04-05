@@ -81,6 +81,30 @@ await brain.registerAction(
 );
 ```
 
+## Config overrides
+
+Override any default constant per Brain instance:
+
+```typescript
+const brain = new Brain(llm, storage, embedding, {
+  llm: {
+    responseMaxTokens: 3000,   // default: 1500
+    saveMaxTokens: 500,        // default: 300
+  },
+  memory: {
+    synapseTreeDepth: 7,       // default: 5
+    synapseBranchFactor: 7,    // default: 5
+    contextTopEntries: 8,      // default: 5
+    decayWindowMs: 30 * 24 * 60 * 60 * 1000, // default: 7 days
+  },
+  chat: {
+    historyMaxStored: 20,      // default: 10
+    maintenanceEveryN: 50,     // default: 20
+    profileUpdateEveryN: 5,    // default: 10
+  },
+});
+```
+
 ## Memory lifecycle
 
 ```
