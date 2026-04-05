@@ -10,10 +10,14 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@the-brain/core": "*",
@@ -21,8 +25,10 @@
   },
   "devDependencies": {
     "@the-brain/core": "*",
+    "@types/node": "^22.0.0",
+    "mongodb-memory-server": "^11.0.1",
     "mongoose": "^8.5.0",
     "typescript": "^5.5.3",
-    "@types/node": "^22.0.0"
+    "vitest": "^4.1.2"
   }
 }
