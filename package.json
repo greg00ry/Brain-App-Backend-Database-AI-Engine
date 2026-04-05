@@ -4,7 +4,7 @@
   "workspaces": ["packages/*", "example-app"],
   "scripts": {
     "build": "npm run build -w packages/core && npm run build -w packages/adapter-mongo && npm run build -w packages/adapter-sqlite && npm run build -w packages/cli && npm run build -w packages/mcp",
-    "test": "npm run test -w packages/core && npm run test -w packages/adapter-sqlite && npm run test -w packages/adapter-mongo",
+    "test": "npm run test -w packages/core && npm run test -w packages/adapter-sqlite && npm run test -w packages/adapter-mongo && npm run test -w packages/cli",
     "dev": "npm run dev -w packages/cli"
   }
 }
