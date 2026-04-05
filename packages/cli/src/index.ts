@@ -4,9 +4,14 @@ dotenv.config();
 
 import { Command } from "commander";
 import * as readline from "readline";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { resolve, extname, basename } from "node:path";
 import { Brain, OpenAICompatibleAdapter, OpenAICompatibleEmbeddingAdapter } from "@the-brain/core";
 import { MongoStorageAdapter, connectDB } from "@the-brain/adapter-mongo";
 import mongoose from "mongoose";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +147,78 @@ program
     });
 
     ask();
+  });
+
+// ─── Ingest helpers ───────────────────────────────────────────────────────────
+
+export function chunkText(text: string, size = 600, overlap = 100): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    chunks.push(text.slice(start, start + size).trim());
+    start += size - overlap;
+  }
+  return chunks.filter(c => c.length > 20);
+}
+
+async function parsePdf(filePath: string): Promise<{ text: string; pages: number }> {
+  const buffer = readFileSync(filePath);
+  const data = await pdfParse(buffer);
+  return { text: data.text, pages: data.numpages };
+}
+
+function collectFiles(input: string): string[] {
+  const resolved = resolve(input);
+  const stat = statSync(resolved);
+  if (stat.isFile()) return [resolved];
+  return readdirSync(resolved)
+    .filter(f => extname(f).toLowerCase() === ".pdf")
+    .map(f => resolve(resolved, f));
+}
+
+// ─── Ingest command ───────────────────────────────────────────────────────────
+
+program
+  .command("ingest <path>")
+  .description("Ingest PDF file(s) as permanent memory")
+  .option("--chunk-size <n>", "Characters per chunk", "600")
+  .option("--overlap <n>", "Overlap between chunks", "100")
+  .action(async (input: string, options: { chunkSize: string; overlap: string }) => {
+    await setup();
+    try {
+      const files = collectFiles(input);
+      if (files.length === 0) {
+        console.log("No PDF files found.");
+        return;
+      }
+
+      const chunkSize = parseInt(options.chunkSize, 10);
+      const overlap = parseInt(options.overlap, 10);
+      let totalChunks = 0;
+
+      for (const filePath of files) {
+        const name = basename(filePath);
+        console.log(`\nIngesting: ${name}`);
+
+        const { text, pages } = await parsePdf(filePath);
+        const chunks = chunkText(text, chunkSize, overlap);
+
+        console.log(`  ${pages} pages → ${chunks.length} chunks`);
+
+        for (let i = 0; i < chunks.length; i++) {
+          const content = `[PDF: ${name}, chunk ${i + 1}/${chunks.length}]\n${chunks[i]}`;
+          await brain.save(USER_ID, content, true);
+          process.stdout.write(`\r  Saved ${i + 1}/${chunks.length}`);
+        }
+
+        console.log(`\n  Done.`);
+        totalChunks += chunks.length;
+      }
+
+      console.log(`\nIngested ${files.length} file(s), ${totalChunks} chunks total. All permanent.`);
+    } finally {
+      await teardown();
+    }
   });
 
 program.parse();
