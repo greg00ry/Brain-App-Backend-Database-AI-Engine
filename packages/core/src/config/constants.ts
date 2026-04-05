@@ -54,6 +54,7 @@ export const MEMORY = {
   SYNAPSE_BRANCH_FACTOR: 3,
   CONTEXT_TOP_ENTRIES: 3,
   RAW_TEXT_PREVIEW_LENGTH: 80,
+  MULTI_QUERY_MAX_TERMS: 3,   // max keywords queried independently in multi-query recall
 
   // Vault repo limits
   DELTA_ENTRIES_LIMIT: 50,

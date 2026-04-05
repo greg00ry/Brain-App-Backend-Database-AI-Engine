@@ -84,6 +84,23 @@ export function formatSynapticTree(nodes: SynapseNode[], indent = ''): string {
   return formatted;
 }
 
+// ─── Merge entries (dedup by _id) ────────────────────────────────────────────
+
+function mergeEntries(arrays: IVaultEntry[][]): IVaultEntry[] {
+  const seen = new Set<string>();
+  const result: IVaultEntry[] = [];
+  for (const arr of arrays) {
+    for (const entry of arr) {
+      const id = entry._id.toString();
+      if (!seen.has(id)) {
+        seen.add(id);
+        result.push(entry);
+      }
+    }
+  }
+  return result;
+}
+
 // ─── Get Brain Context ────────────────────────────────────────────────────────
 
 export async function getBrainContext(
@@ -97,17 +114,36 @@ export async function getBrainContext(
   hasContext: boolean;
 }> {
   try {
+    const keywords = extractKeywords(userText);
     let entries: IVaultEntry[];
 
     if (embeddingAdapter) {
-      const vector = await embeddingAdapter.embed(userText);
-      entries = await storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+      const terms = keywords.slice(0, MEMORY.MULTI_QUERY_MAX_TERMS);
+
+      if (terms.length === 0) {
+        // No keywords — fall back to full-text embedding
+        const vector = await embeddingAdapter.embed(userText);
+        entries = await storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+      } else {
+        // Multi-query: embed each term separately, merge results
+        const results = await Promise.all(
+          terms.map(async (term) => {
+            const vector = await embeddingAdapter.embed(term);
+            return storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+          }),
+        );
+        entries = mergeEntries(results).slice(0, MEMORY.CONTEXT_TOP_ENTRIES);
+      }
     } else {
-      const keywords = extractKeywords(userText);
       if (keywords.length === 0) {
         return { relevantEntries: [], synapticTree: '💭 Brak słów kluczowych do wyszukania.\n', hasContext: false };
       }
-      entries = await storage.findRelevantEntries(userId, keywords);
+      // Multi-query: query each term separately, merge results
+      const terms = keywords.slice(0, MEMORY.MULTI_QUERY_MAX_TERMS);
+      const results = await Promise.all(
+        terms.map(term => storage.findRelevantEntries(userId, [term])),
+      );
+      entries = mergeEntries(results);
     }
 
     if (entries.length === 0) {

@@ -234,6 +234,12 @@ describe("formatSynapticTree", () => {
 // getBrainContext
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Multi-query helper: collects all keywords passed across all findRelevantEntries calls
+function allQueryKeywords(storage: IStorageAdapter): string[] {
+  return (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls
+    .flatMap((call: unknown[]) => call[1] as string[]);
+}
+
 describe("getBrainContext", () => {
   // ─── With embedding adapter ────────────────────────────────────────────────
 
@@ -247,7 +253,9 @@ describe("getBrainContext", () => {
 
     await getBrainContext("user-1", "python tips", storage, embeddingAdapter);
 
-    expect(embed).toHaveBeenCalledWith("python tips");
+    // Multi-query: each keyword is embedded separately
+    expect(embed).toHaveBeenCalledWith("python");
+    expect(embed).toHaveBeenCalledWith("tips");
     expect(storage.findSimilarEntries).toHaveBeenCalled();
     expect(storage.findRelevantEntries).not.toHaveBeenCalled();
   });
@@ -428,16 +436,16 @@ describe("keyword extraction (via getBrainContext)", () => {
   it("extracts meaningful words from mixed text", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "I like Python programming tips", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    // Multi-query: each keyword queried separately; MULTI_QUERY_MAX_TERMS=3 caps at first 3
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("python");
     expect(keywords).toContain("programming");
-    expect(keywords).toContain("tips");
   });
 
   it("deduplicates keywords", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "python python python tips tips", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    const keywords = allQueryKeywords(storage);
     const pythonCount = keywords.filter(k => k === "python").length;
     expect(pythonCount).toBe(1);
   });
@@ -445,7 +453,7 @@ describe("keyword extraction (via getBrainContext)", () => {
   it("lowercases all keywords", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "Python TypeScript MongoDB", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("python");
     expect(keywords).toContain("typescript");
     expect(keywords).toContain("mongodb");
@@ -455,7 +463,7 @@ describe("keyword extraction (via getBrainContext)", () => {
   it("strips punctuation from words", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "python, typescript! mongodb.", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("python");
     expect(keywords).toContain("typescript");
   });
@@ -675,7 +683,10 @@ describe("getBrainContext — embedding adapter throws", () => {
     const storage = makeStorage({ findSimilarEntries: vi.fn().mockResolvedValue([]) });
 
     await getBrainContext("user-1", "exact query text", storage, embeddingAdapter);
-    expect(embed).toHaveBeenCalledWith("exact query text");
+    // Multi-query: each keyword is embedded separately
+    expect(embed).toHaveBeenCalledWith("exact");
+    expect(embed).toHaveBeenCalledWith("query");
+    expect(embed).toHaveBeenCalledWith("text");
   });
 });
 
@@ -761,7 +772,7 @@ describe("extractKeywords — stop word filter precision", () => {
   it("'się' (3 chars) is filtered as a stop word", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "programowanie się uczy", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).not.toContain("się");
     expect(keywords).toContain("programowanie");
     expect(keywords).toContain("uczy");
@@ -770,7 +781,7 @@ describe("extractKeywords — stop word filter precision", () => {
   it("'jest' (4 chars) is filtered as a stop word", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "python jest super", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).not.toContain("jest");
     expect(keywords).toContain("python");
     expect(keywords).toContain("super");
@@ -795,7 +806,7 @@ describe("extractKeywords — stop word filter precision", () => {
   it("Polish diacritics preserved in keywords", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "programowanie języka łatwość", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("programowanie");
     expect(keywords).toContain("języka");
     expect(keywords).toContain("łatwość");
@@ -804,7 +815,7 @@ describe("extractKeywords — stop word filter precision", () => {
   it("numbers kept as part of keywords (\\w matches digits)", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "python3 typescript5 version99", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("python3");
     expect(keywords).toContain("version99");
   });
@@ -812,7 +823,7 @@ describe("extractKeywords — stop word filter precision", () => {
   it("hyphenated words split at hyphen (hyphen → space → two words)", async () => {
     const storage = makeStorage({ findRelevantEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "self-learning step-by-step", storage);
-    const keywords = (storage.findRelevantEntries as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string[];
+    const keywords = allQueryKeywords(storage);
     expect(keywords).toContain("self");
     expect(keywords).toContain("learning");
     expect(keywords).toContain("step");
