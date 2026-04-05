@@ -24,8 +24,8 @@ jobs:
       - name: Build core
         run: npm run build -w packages/core
 
-      - name: Build adapter-files
-        run: npm run build -w packages/adapter-files
+      - name: Build adapter-sqlite
+        run: npm run build -w packages/adapter-sqlite
 
       - name: Run tests
         run: npm test
