@@ -23,14 +23,15 @@ export async function getSynapticTree(
   storage: IStorageAdapter,
   depth = 1,
   visited: Set<string> = new Set(),
-  currentLevel = 1
+  currentLevel = 1,
+  branchFactor: number = MEMORY.SYNAPSE_BRANCH_FACTOR,
 ): Promise<SynapseNode[]> {
   if (depth <= 0 || visited.has(startEntryId)) return [];
 
   visited.add(startEntryId);
 
   try {
-    const synapses = await storage.getSynapsesBySource(startEntryId, MEMORY.SYNAPSE_BRANCH_FACTOR);
+    const synapses = await storage.getSynapsesBySource(startEntryId, branchFactor);
 
     if (synapses.length === 0) return [];
 
@@ -42,7 +43,7 @@ export async function getSynapticTree(
         || synapse.targetRawText?.substring(0, MEMORY.RAW_TEXT_PREVIEW_LENGTH)
         || 'Brak opisu';
 
-      const children = await getSynapticTree(targetId, storage, depth - 1, visited, currentLevel + 1);
+      const children = await getSynapticTree(targetId, storage, depth - 1, visited, currentLevel + 1, branchFactor);
 
       nodes.push({
         entryId: targetId,
@@ -108,11 +109,20 @@ export async function getBrainContext(
   userText: string,
   storage: IStorageAdapter,
   embeddingAdapter?: IEmbeddingAdapter,
+  memoryConfig?: {
+    synapseTreeDepth?: number;
+    synapseBranchFactor?: number;
+    contextTopEntries?: number;
+  },
 ): Promise<{
   relevantEntries: IVaultEntry[];
   synapticTree: string;
   hasContext: boolean;
 }> {
+  const treeDepth = memoryConfig?.synapseTreeDepth ?? MEMORY.SYNAPSE_TREE_DEPTH;
+  const branchFactor = memoryConfig?.synapseBranchFactor ?? MEMORY.SYNAPSE_BRANCH_FACTOR;
+  const topEntries = memoryConfig?.contextTopEntries ?? MEMORY.CONTEXT_TOP_ENTRIES;
+
   try {
     const keywords = extractKeywords(userText);
     let entries: IVaultEntry[];
@@ -123,16 +133,16 @@ export async function getBrainContext(
       if (terms.length === 0) {
         // No keywords — fall back to full-text embedding
         const vector = await embeddingAdapter.embed(userText);
-        entries = await storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+        entries = await storage.findSimilarEntries(userId, vector, topEntries);
       } else {
         // Multi-query: embed each term separately, merge results
         const results = await Promise.all(
           terms.map(async (term) => {
             const vector = await embeddingAdapter.embed(term);
-            return storage.findSimilarEntries(userId, vector, MEMORY.CONTEXT_TOP_ENTRIES);
+            return storage.findSimilarEntries(userId, vector, topEntries);
           }),
         );
-        entries = mergeEntries(results).slice(0, MEMORY.CONTEXT_TOP_ENTRIES);
+        entries = mergeEntries(results).slice(0, topEntries);
       }
     } else {
       if (keywords.length === 0) {
@@ -158,7 +168,7 @@ export async function getBrainContext(
 
       synapticTreeFormatted += `📍 START: "${summary}"\n`;
 
-      const tree = await getSynapticTree(entryId, storage, MEMORY.SYNAPSE_TREE_DEPTH);
+      const tree = await getSynapticTree(entryId, storage, treeDepth, new Set(), 1, branchFactor);
       synapticTreeFormatted += tree.length > 0
         ? formatSynapticTree(tree)
         : '   (brak połączeń)\n';

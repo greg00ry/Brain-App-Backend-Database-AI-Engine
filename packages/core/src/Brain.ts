@@ -10,7 +10,27 @@ import { RESEARCH_ANSWER_PROMPT } from "./services/ai/prompts/research-answer.pr
 import { SAVE_RESPONSE_PROMPT } from "./services/ai/prompts/save-response.prompt.js";
 import { PERSONALITY_SYSTEM_PROMPT } from "./services/ai/prompts/personality.prompt.js";
 import { USER_PROFILE_PROMPT, buildSystemPrompt } from "./services/ai/prompts/user-profile.prompt.js";
-import { LLM, CHAT } from "./config/constants.js";
+import { LLM, CHAT, MEMORY, BRAIN } from "./config/constants.js";
+
+export interface BrainConfig {
+  llm?: {
+    responseTemperature?: number;
+    responseMaxTokens?: number;
+    saveTemperature?: number;
+    saveMaxTokens?: number;
+  };
+  memory?: {
+    synapseTreeDepth?: number;
+    synapseBranchFactor?: number;
+    contextTopEntries?: number;
+    decayWindowMs?: number;
+  };
+  chat?: {
+    historyMaxStored?: number;
+    maintenanceEveryN?: number;
+    profileUpdateEveryN?: number;
+  };
+}
 
 export type ActionHandler = (
   userId: string,
@@ -38,12 +58,37 @@ export class Brain {
   private handlers = new Map<string, ActionHandler>();
   private saveCount = 0;
   private conversationCount = 0;
+  private readonly cfg: Required<{
+    llm: Required<NonNullable<BrainConfig["llm"]>>;
+    memory: Required<NonNullable<BrainConfig["memory"]>>;
+    chat: Required<NonNullable<BrainConfig["chat"]>>;
+  }>;
 
   constructor(
     private readonly llm: ILLMAdapter,
     private readonly storage: IStorageAdapter,
     private readonly embedding?: IEmbeddingAdapter,
+    config?: BrainConfig,
   ) {
+    this.cfg = {
+      llm: {
+        responseTemperature: config?.llm?.responseTemperature ?? LLM.RESPONSE_TEMPERATURE,
+        responseMaxTokens: config?.llm?.responseMaxTokens ?? LLM.RESPONSE_MAX_TOKENS,
+        saveTemperature: config?.llm?.saveTemperature ?? LLM.SAVE_TEMPERATURE,
+        saveMaxTokens: config?.llm?.saveMaxTokens ?? LLM.SAVE_MAX_TOKENS,
+      },
+      memory: {
+        synapseTreeDepth: config?.memory?.synapseTreeDepth ?? MEMORY.SYNAPSE_TREE_DEPTH,
+        synapseBranchFactor: config?.memory?.synapseBranchFactor ?? MEMORY.SYNAPSE_BRANCH_FACTOR,
+        contextTopEntries: config?.memory?.contextTopEntries ?? MEMORY.CONTEXT_TOP_ENTRIES,
+        decayWindowMs: config?.memory?.decayWindowMs ?? BRAIN.DECAY_WINDOW_MS,
+      },
+      chat: {
+        historyMaxStored: config?.chat?.historyMaxStored ?? CHAT.HISTORY_MAX_STORED,
+        maintenanceEveryN: config?.chat?.maintenanceEveryN ?? CHAT.MAINTENANCE_EVERY_N,
+        profileUpdateEveryN: config?.chat?.profileUpdateEveryN ?? CHAT.PROFILE_UPDATE_EVERY_N,
+      },
+    };
     this.handlers.set("RESEARCH_BRAIN", async (userId, text, { synapticTree, hasContext }, _llm, chatHistory) => {
       const userProfile = await this.storage.getUserProfile(userId);
       const systemPrompt = buildSystemPrompt(PERSONALITY_SYSTEM_PROMPT, userProfile);
@@ -55,8 +100,8 @@ export class Brain {
       const answer = await this.llm.complete({
         systemPrompt,
         userPrompt: prompt,
-        temperature: LLM.RESPONSE_TEMPERATURE,
-        maxTokens: LLM.RESPONSE_MAX_TOKENS,
+        temperature: this.cfg.llm.responseTemperature,
+        maxTokens: this.cfg.llm.responseMaxTokens,
       });
       return answer ?? "Coś poszło nie tak z generowaniem odpowiedzi.";
     });
@@ -68,8 +113,8 @@ export class Brain {
       const answer = await this.llm.complete({
         systemPrompt,
         userPrompt: SAVE_RESPONSE_PROMPT(text, chatHistory),
-        temperature: LLM.SAVE_TEMPERATURE,
-        maxTokens: LLM.SAVE_MAX_TOKENS,
+        temperature: this.cfg.llm.saveTemperature,
+        maxTokens: this.cfg.llm.saveMaxTokens,
       });
       return answer ?? "Zapisałem to.";
     });
@@ -101,7 +146,7 @@ export class Brain {
 
     const intent = await classifyIntent({ userText: text, chatHistory, actions }, this.llm);
 
-    const context = await getBrainContext(userId, text, this.storage, this.embedding);
+    const context = await getBrainContext(userId, text, this.storage, this.embedding, this.cfg.memory);
 
     const handler = this.handlers.get(intent.action);
     if (!handler) {
@@ -116,17 +161,17 @@ export class Brain {
 
       // Trigger maintenance every N saves (fire and forget)
       this.saveCount++;
-      if (this.saveCount % CHAT.MAINTENANCE_EVERY_N === 0) {
+      if (this.saveCount % this.cfg.chat.maintenanceEveryN === 0) {
         this.runMaintenance().catch(err => console.error('[Brain] Maintenance error:', err));
       }
 
       // Persist chat history
-      await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
-      await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+      await this.storage.appendChatMessage(userId, "user", text, this.cfg.chat.historyMaxStored);
+      await this.storage.appendChatMessage(userId, "assistant", answer, this.cfg.chat.historyMaxStored);
 
       // Update user profile every N conversations (fire and forget)
       this.conversationCount++;
-      if (this.conversationCount % CHAT.PROFILE_UPDATE_EVERY_N === 0) {
+      if (this.conversationCount % this.cfg.chat.profileUpdateEveryN === 0) {
         this.updateUserProfile(userId, chatHistory).catch(err =>
           console.error('[Brain] Profile update error:', err)
         );
@@ -137,12 +182,12 @@ export class Brain {
 
     answer = await handler(userId, text, context, this.llm, chatHistory);
 
-    await this.storage.appendChatMessage(userId, "user", text, CHAT.HISTORY_MAX_STORED);
-    await this.storage.appendChatMessage(userId, "assistant", answer, CHAT.HISTORY_MAX_STORED);
+    await this.storage.appendChatMessage(userId, "user", text, this.cfg.chat.historyMaxStored);
+    await this.storage.appendChatMessage(userId, "assistant", answer, this.cfg.chat.historyMaxStored);
 
     // Update user profile every N conversations (fire and forget)
     this.conversationCount++;
-    if (this.conversationCount % CHAT.PROFILE_UPDATE_EVERY_N === 0) {
+    if (this.conversationCount % this.cfg.chat.profileUpdateEveryN === 0) {
       this.updateUserProfile(userId, chatHistory).catch(err =>
         console.error('[Brain] Profile update error:', err)
       );
@@ -176,7 +221,7 @@ export class Brain {
   }
 
   async recall(userId: string, text: string) {
-    return getBrainContext(userId, text, this.storage, this.embedding);
+    return getBrainContext(userId, text, this.storage, this.embedding, this.cfg.memory);
   }
 
   async save(userId: string, text: string, isPermanent = false) {
@@ -184,7 +229,7 @@ export class Brain {
   }
 
   async runMaintenance() {
-    const subStats = await runSubconsciousRoutine(this.storage);
+    const subStats = await runSubconsciousRoutine(this.storage, this.cfg.memory.decayWindowMs);
     const consciousStats = await runConsciousProcessor(this.llm, this.storage);
     return { subStats, consciousStats };
   }

@@ -19,7 +19,7 @@ export interface SubconsciousStats {
  * Subconscious routine - runs WITHOUT AI, pure logic/math operations.
  * Handles: Decay, Pruning, and marking entries ready for consolidation.
  */
-export async function runSubconsciousRoutine(storage: IStorageAdapter): Promise<SubconsciousStats> {
+export async function runSubconsciousRoutine(storage: IStorageAdapter, decayWindowMs = BRAIN.DECAY_WINDOW_MS): Promise<SubconsciousStats> {
   console.log('\n🌘 [Podświadomość] Uruchamiam rutynę podświadomości...');
   const startTime = Date.now();
 
@@ -41,7 +41,7 @@ export async function runSubconsciousRoutine(storage: IStorageAdapter): Promise<
     // ========================================
     console.log('🌘 [Podświadomość] Faza 1: DECAY (zanikanie wspomnień)...');
 
-    const oneDayAgo = new Date(Date.now() - BRAIN.DECAY_WINDOW_MS);
+    const oneDayAgo = new Date(Date.now() - decayWindowMs);
     const entriesToDecay = await storage.findEntriesToDecay(oneDayAgo);
 
     if (entriesToDecay.length > 0) {

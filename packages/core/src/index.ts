@@ -1,6 +1,6 @@
 // ─── Main class ───────────────────────────────────────────────────────────────
 export { Brain } from "./Brain.js";
-export type { ActionHandler, ProcessResult } from "./Brain.js";
+export type { ActionHandler, ProcessResult, BrainConfig } from "./Brain.js";
 
 // ─── Adapter interfaces ───────────────────────────────────────────────────────
 export type { ILLMAdapter, LLMRequest } from "./adapters/ILLMAdapter.js";
