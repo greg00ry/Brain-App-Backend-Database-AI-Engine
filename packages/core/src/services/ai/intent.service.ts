@@ -127,7 +127,18 @@ export async function classifyIntent(
     }
 
     // Step 5: Take LLM result even if low confidence
-    if (llmResult) return llmResult;
+    // Structural routing applies here too: question + SAVE_ONLY → RESEARCH_BRAIN
+    if (llmResult) {
+      if (llmResult.action === "SAVE_ONLY" && /\?/.test(userText) && validActions.has("RESEARCH_BRAIN")) {
+        return {
+          action: "RESEARCH_BRAIN",
+          reasoning: "Structural routing: question redirected from SAVE_ONLY",
+          confidence: 88,
+          source: "rule",
+        };
+      }
+      return llmResult;
+    }
 
   } catch (err) {
     console.error(`[IntentService] Error:`, err instanceof Error ? err.message : String(err));
