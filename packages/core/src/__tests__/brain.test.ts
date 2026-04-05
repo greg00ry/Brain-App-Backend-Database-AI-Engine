@@ -271,30 +271,27 @@ describe("Brain", () => {
 
   // ─── Maintenance triggered every MAINTENANCE_EVERY_N saves ───────────────
 
-  it("maintenance is triggered after every 5th SAVE_ONLY (fire and forget)", async () => {
-    // spy on runMaintenance
+  it("maintenance is triggered after every 20th SAVE_ONLY (fire and forget)", async () => {
     const maintenanceSpy = vi.spyOn(brain, "runMaintenance").mockResolvedValue({
       subStats: { decayed: 0, pruned: 0, readyForLTM: 0, totalProcessed: 0 },
       consciousStats: { analyzed: 0, consolidated: 0, synapsesCreated: 0 },
     });
 
-    // process 5 SAVE_ONLY actions
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
       await brain.process("user-1", `fact number ${i}`);
-      // allow microtasks to settle
       await Promise.resolve();
     }
 
     expect(maintenanceSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("maintenance not triggered before 5th save", async () => {
+  it("maintenance not triggered before 20th save", async () => {
     const maintenanceSpy = vi.spyOn(brain, "runMaintenance").mockResolvedValue({
       subStats: { decayed: 0, pruned: 0, readyForLTM: 0, totalProcessed: 0 },
       consciousStats: { analyzed: 0, consolidated: 0, synapsesCreated: 0 },
     });
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 19; i++) {
       await brain.process("user-1", `fact number ${i}`);
     }
 

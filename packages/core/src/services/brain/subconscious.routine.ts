@@ -1,5 +1,5 @@
 import { IStorageAdapter } from "../../adapters/IStorageAdapter.js";
-import { MISC } from "../../config/constants.js";
+import { BRAIN } from "../../config/constants.js";
 
 
 // ============================================================================
@@ -41,7 +41,7 @@ export async function runSubconsciousRoutine(storage: IStorageAdapter): Promise<
     // ========================================
     console.log('🌘 [Podświadomość] Faza 1: DECAY (zanikanie wspomnień)...');
 
-    const oneDayAgo = new Date(Date.now() - MISC.ONE_DAY_MS);
+    const oneDayAgo = new Date(Date.now() - BRAIN.DECAY_WINDOW_MS);
     const entriesToDecay = await storage.findEntriesToDecay(oneDayAgo);
 
     if (entriesToDecay.length > 0) {

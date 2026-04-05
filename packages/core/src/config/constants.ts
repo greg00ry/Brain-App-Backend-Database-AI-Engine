@@ -52,6 +52,9 @@ export const BRAIN = {
 
   // Synapse thresholds
   SYNAPSE_PRUNE_WEIGHT: 0.1,       // synapses below this are pruned
+
+  // Decay window — entries inactive longer than this lose strength
+  DECAY_WINDOW_MS: 7 * 24 * 60 * 60 * 1000, // 7 days
 } as const;
 
 // ─── Memory / Retrieval ───────────────────────────────────────────────────────
@@ -85,7 +88,7 @@ export const CHAT = {
   HISTORY_LIMIT_FOR_LLM: 5,        // messages sent to LLM
   HISTORY_RECENT_FOR_PROMPT: 3,    // messages included in prompt
   HISTORY_MAX_STORED: 10,          // sliding window in DB
-  MAINTENANCE_EVERY_N: 5,          // trigger maintenance every N saves
+  MAINTENANCE_EVERY_N: 20,         // trigger maintenance every N saves
 } as const;
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────
