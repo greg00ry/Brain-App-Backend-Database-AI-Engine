@@ -92,11 +92,9 @@ describe("analyzeTextWithAI", () => {
     expect(result.category).toBe("Uncategorized");
   });
 
-  it("FALLBACK summary is text.substring(0,100) + '...'", async () => {
-    const text = "short";
-    const result = await analyzeTextWithAI(text, makeLLM(null));
-    // always appends '...' even for short text — misleading truncation marker
-    expect(result.summary).toBe("short...");
+  it("FALLBACK summary is full text when shorter than 100 chars", async () => {
+    const result = await analyzeTextWithAI("short", makeLLM(null));
+    expect(result.summary).toBe("short");
   });
 
   it("FALLBACK truncates text at 100 chars and appends '...'", async () => {
@@ -106,11 +104,11 @@ describe("analyzeTextWithAI", () => {
     expect(result.summary.length).toBe(103);
   });
 
-  it("FALLBACK summary appends '...' to exact 100-char text too", async () => {
-    // Documents: even text exactly 100 chars gets '...' appended
+  it("FALLBACK summary does NOT append '...' to exact 100-char text", async () => {
     const text = "x".repeat(100);
     const result = await analyzeTextWithAI(text, makeLLM(null));
-    expect(result.summary).toBe("x".repeat(100) + "...");
+    expect(result.summary).toBe("x".repeat(100));
+    expect(result.summary.endsWith("...")).toBe(false);
   });
 
   // ─── Fallback: invalid JSON ────────────────────────────────────────────────
@@ -129,20 +127,20 @@ describe("analyzeTextWithAI", () => {
 
   // ─── LLM throws ───────────────────────────────────────────────────────────
 
-  it("propagates LLM error — no try/catch (unlike embedding which is non-fatal)", async () => {
-    // This is an inconsistency: embedding errors are swallowed, LLM errors are not
-    await expect(analyzeTextWithAI("text", makeLLMError())).rejects.toThrow("LLM timeout");
+  it("returns FALLBACK when LLM throws — consistent with embedding non-fatal behaviour", async () => {
+    const result = await analyzeTextWithAI("text", makeLLMError());
+    expect(result.isProcessed).toBe(false);
+    expect(result.tags).toEqual(["unprocessed"]);
   });
 
   // ─── Missing fields in LLM response ──────────────────────────────────────
 
-  it("missing summary falls back to text.substring(0, 50)", async () => {
-    const text = "x".repeat(80);
+  it("missing summary falls back to truncate(text) — same 100-char limit as FALLBACK", async () => {
+    const text = "x".repeat(150);
     const llm = makeLLM(JSON.stringify({ tags: [], strength: 5, category: "Tech" }));
     const result = await analyzeTextWithAI(text, llm);
-    // NOTE: fallback here uses 50, not 100 like FALLBACK_ANALYSIS — inconsistency
-    expect(result.summary).toBe("x".repeat(50));
-    expect(result.isProcessed).toBe(true); // still isProcessed=true
+    expect(result.summary).toBe("x".repeat(100) + "...");
+    expect(result.isProcessed).toBe(true);
   });
 
   it("missing tags defaults to empty array", async () => {
@@ -317,12 +315,13 @@ describe("proccessAndStore", () => {
 
   // ─── LLM / storage errors propagate ──────────────────────────────────────
 
-  it("propagates LLM error (analysis is fatal, unlike embedding)", async () => {
+  it("LLM error uses FALLBACK analysis — createEntry still called", async () => {
     const storage = makeStorage();
-    await expect(
-      proccessAndStore(USER, TEXT, makeLLMError(), storage)
-    ).rejects.toThrow("LLM timeout");
-    expect(storage.createEntry).not.toHaveBeenCalled();
+    await proccessAndStore(USER, TEXT, makeLLMError(), storage);
+    expect(storage.createEntry).toHaveBeenCalled();
+    const analysis = (storage.createEntry as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(analysis.isProcessed).toBe(false);
+    expect(analysis.tags).toEqual(["unprocessed"]);
   });
 
   it("propagates createEntry error", async () => {
