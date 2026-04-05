@@ -134,7 +134,23 @@ describe("save command", () => {
     expect(mockBrain.save).toHaveBeenCalledWith(
       expect.any(String),
       "important note",
+      false,
     );
+  });
+
+  it("calls brain.save with isPermanent=true when --permanent flag is set", async () => {
+    await runCLI("save", "important note", "--permanent");
+    expect(mockBrain.save).toHaveBeenCalledWith(
+      expect.any(String),
+      "important note",
+      true,
+    );
+  });
+
+  it("prints Saved [id] [PERMANENT] when --permanent flag is set", async () => {
+    mockBrain.save.mockResolvedValue({ _id: "perm-123" });
+    await runCLI("save", "some text", "--permanent");
+    expect(consoleSpy).toHaveBeenCalledWith("Saved [perm-123] [PERMANENT]");
   });
 
   it("prints Saved [id] to console", async () => {

@@ -131,8 +131,8 @@ export class Brain {
     return getBrainContext(userId, text, this.storage, this.embedding);
   }
 
-  async save(userId: string, text: string) {
-    return proccessAndStore(userId, text, this.llm, this.storage, this.embedding);
+  async save(userId: string, text: string, isPermanent = false) {
+    return proccessAndStore(userId, text, this.llm, this.storage, this.embedding, isPermanent);
   }
 
   async runMaintenance() {

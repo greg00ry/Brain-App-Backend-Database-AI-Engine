@@ -32,6 +32,7 @@ export interface IVaultEntry {
   embedding?: number[];
   isAnalyzed: boolean;
   isConsolidated: boolean;
+  isPermanent: boolean;
   lastActivityAt: Date;
   createdAt: Date;
   updatedAt: Date;

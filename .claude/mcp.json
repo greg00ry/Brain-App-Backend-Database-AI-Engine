@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "the-brain": {
+      "command": "node",
+      "args": ["/Users/grzegorztrzaskoma/Desktop/GT Investments/The Brain App/packages/mcp/dist/index.js"],
+      "env": {
+        "BRAIN_LLM_URL": "http://localhost:11434/v1/chat/completions",
+        "BRAIN_LLM_MODEL": "llama3.2",
+        "BRAIN_STORAGE_PATH": "/Users/grzegorztrzaskoma/.brain"
+      }
+    }
+  }
+}

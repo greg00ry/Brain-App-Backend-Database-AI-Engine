@@ -80,7 +80,8 @@ export class MongoStorageAdapter implements IStorageAdapter {
   // ─── Entry CRUD ───────────────────────────────────────────────────────────
 
   async createEntry(userId: string, rawText: string, analysis: EntryAnalysisData): Promise<IVaultEntry> {
-    const entry = new VaultEntry({ userId, rawText, analysis });
+    const { isPermanent = false, ...analysisData } = analysis;
+    const entry = new VaultEntry({ userId, rawText, analysis: analysisData, isPermanent });
     return entry.save() as unknown as IVaultEntry;
   }
 
@@ -359,6 +360,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
   async findEntriesToDecay(since: Date): Promise<IVaultEntry[]> {
     return VaultEntry.find({
       isConsolidated: false,
+      isPermanent: { $ne: true },
       lastActivityAt: { $lt: since },
       'analysis.strength': { $gt: 0 },
     }).select('_id analysis.strength') as unknown as IVaultEntry[];
@@ -380,6 +382,7 @@ export class MongoStorageAdapter implements IStorageAdapter {
     const result = await VaultEntry.deleteMany({
       'analysis.strength': { $lte: BRAIN.STRENGTH_DECAY_PRUNE },
       isConsolidated: false,
+      isPermanent: { $ne: true },
     });
     return result.deletedCount;
   }

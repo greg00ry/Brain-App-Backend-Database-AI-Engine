@@ -63,11 +63,13 @@ program
 program
   .command("save <text>")
   .description("Save text directly to vault")
-  .action(async (text: string) => {
+  .option("--permanent", "Mark as permanent — never decays or gets pruned")
+  .action(async (text: string, options: { permanent?: boolean }) => {
     await setup();
     try {
-      const entry = await brain.save(USER_ID, text);
-      console.log(`Saved [${entry._id}]`);
+      const entry = await brain.save(USER_ID, text, options.permanent ?? false);
+      const flag = options.permanent ? " [PERMANENT]" : "";
+      console.log(`Saved [${entry._id}]${flag}`);
     } finally {
       await teardown();
     }

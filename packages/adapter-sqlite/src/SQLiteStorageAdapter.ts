@@ -51,6 +51,7 @@ function toVaultEntry(row: Record<string, unknown>): IVaultEntry {
     embedding: row.embedding ? JSON.parse(String(row.embedding)) : undefined,
     isAnalyzed: Boolean(row.isAnalyzed),
     isConsolidated: Boolean(row.isConsolidated),
+    isPermanent: Boolean(row.isPermanent),
     lastActivityAt: new Date(String(row.lastActivityAt)),
     createdAt: new Date(String(row.createdAt)),
     updatedAt: new Date(String(row.updatedAt)),
@@ -80,6 +81,7 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
         isProcessed   INTEGER DEFAULT 0,
         isAnalyzed    INTEGER DEFAULT 0,
         isConsolidated INTEGER DEFAULT 0,
+        isPermanent   INTEGER DEFAULT 0,
         embedding     TEXT,
         lastActivityAt TEXT NOT NULL,
         createdAt     TEXT NOT NULL,
@@ -136,8 +138,8 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
     const id = uid();
     const now = new Date().toISOString();
     this.db.prepare(`
-      INSERT INTO vault_entries (id, userId, rawText, summary, tags, strength, category, isProcessed, isAnalyzed, lastActivityAt, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      INSERT INTO vault_entries (id, userId, rawText, summary, tags, strength, category, isProcessed, isAnalyzed, isPermanent, lastActivityAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
     `).run(
       id, userId, rawText,
       analysis.summary,
@@ -145,6 +147,7 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
       analysis.strength,
       analysis.category,
       analysis.isProcessed ? 1 : 0,
+      analysis.isPermanent ? 1 : 0,
       now, now, now,
     );
     return toVaultEntry(this.db.prepare("SELECT * FROM vault_entries WHERE id = ?").get(id) as Record<string, unknown>);
@@ -387,7 +390,7 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
 
   async findEntriesToDecay(since: Date): Promise<IVaultEntry[]> {
     const rows = this.db.prepare(
-      "SELECT * FROM vault_entries WHERE lastActivityAt < ? AND strength > 0"
+      "SELECT * FROM vault_entries WHERE lastActivityAt < ? AND strength > 0 AND isPermanent = 0"
     ).all(since.toISOString()) as Record<string, unknown>[];
     return rows.map(toVaultEntry);
   }
@@ -404,7 +407,7 @@ export class SQLiteStorageAdapter implements IStorageAdapter {
   }
 
   async pruneDeadEntries(): Promise<number> {
-    const result = this.db.prepare("DELETE FROM vault_entries WHERE strength <= 0").run();
+    const result = this.db.prepare("DELETE FROM vault_entries WHERE strength <= 0 AND isPermanent = 0").run();
     return Number(result.changes);
   }
 

@@ -568,20 +568,20 @@ describe("getSynapticTree — reason fallback", () => {
 });
 
 describe("getSynapticTree — SYNAPSE_BRANCH_FACTOR limit", () => {
-  it("passes SYNAPSE_BRANCH_FACTOR (3) as limit to getSynapsesBySource", async () => {
+  it("passes SYNAPSE_BRANCH_FACTOR (5) as limit to getSynapsesBySource", async () => {
     const getSynapsesBySource = vi.fn().mockResolvedValue([]);
     const storage = makeStorage({ getSynapsesBySource });
     await getSynapticTree("root", storage, 1);
-    expect(getSynapsesBySource).toHaveBeenCalledWith("root", 3);
+    expect(getSynapsesBySource).toHaveBeenCalledWith("root", 5);
   });
 
   it("does NOT pass a hardcoded limit — uses the constant", async () => {
     const getSynapsesBySource = vi.fn().mockResolvedValue([]);
     const storage = makeStorage({ getSynapsesBySource });
     await getSynapticTree("root", storage, 2);
-    // for both root and any children, second arg must be 3 (SYNAPSE_BRANCH_FACTOR)
+    // for both root and any children, second arg must be 5 (SYNAPSE_BRANCH_FACTOR)
     for (const call of getSynapsesBySource.mock.calls) {
-      expect(call[1]).toBe(3);
+      expect(call[1]).toBe(5);
     }
   });
 });
@@ -836,12 +836,12 @@ describe("extractKeywords — stop word filter precision", () => {
 // getBrainContext — CONTEXT_TOP_ENTRIES limit
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("getBrainContext — CONTEXT_TOP_ENTRIES (3) passed to findSimilarEntries", () => {
-  it("passes exactly CONTEXT_TOP_ENTRIES (3) as topK to findSimilarEntries", async () => {
+describe("getBrainContext — CONTEXT_TOP_ENTRIES (5) passed to findSimilarEntries", () => {
+  it("passes exactly CONTEXT_TOP_ENTRIES (5) as topK to findSimilarEntries", async () => {
     const embeddingAdapter: IEmbeddingAdapter = { embed: vi.fn().mockResolvedValue([0.1]) };
     const storage = makeStorage({ findSimilarEntries: vi.fn().mockResolvedValue([]) });
     await getBrainContext("user-1", "query", storage, embeddingAdapter);
-    expect(storage.findSimilarEntries).toHaveBeenCalledWith("user-1", [0.1], 3);
+    expect(storage.findSimilarEntries).toHaveBeenCalledWith("user-1", [0.1], 5);
   });
 });
 
@@ -849,30 +849,32 @@ describe("getBrainContext — CONTEXT_TOP_ENTRIES (3) passed to findSimilarEntri
 // getBrainContext — SYNAPSE_TREE_DEPTH passed to getSynapticTree
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("getBrainContext — getSynapticTree called with SYNAPSE_TREE_DEPTH (3)", () => {
-  it("getSynapsesBySource is called at depth up to 3 levels", async () => {
-    // If SYNAPSE_TREE_DEPTH=3 is passed correctly, getSynapsesBySource is called for
-    // root (depth 3→2), child (2→1), grandchild (1→0 stops)
+describe("getBrainContext — getSynapticTree called with SYNAPSE_TREE_DEPTH (5)", () => {
+  it("getSynapsesBySource is called at depth up to 5 levels", async () => {
+    // If SYNAPSE_TREE_DEPTH=5 is passed correctly, getSynapsesBySource traverses 5 levels deep
+    // chain: e1→child1→grand1→great1→level4→level5 but level5's children require depth>0
     const e1 = makeEntry("e1");
     const storage = makeStorage({
       findRelevantEntries: vi.fn().mockResolvedValue([e1]),
       getSynapsesBySource: vi.fn().mockImplementation(async (id: string) => {
-        if (id === "e1") return [makeSynapse("child1")];
+        if (id === "e1")     return [makeSynapse("child1")];
         if (id === "child1") return [makeSynapse("grand1")];
         if (id === "grand1") return [makeSynapse("great1")];
+        if (id === "great1") return [makeSynapse("level4")];
+        if (id === "level4") return [makeSynapse("level5")];
         return [];
       }),
     });
 
     const result = await getBrainContext("user-1", "python programming", storage);
     const allCalls = (storage.getSynapsesBySource as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0]);
-    // with depth=3: e1→child1→grand1→great1 but great1's children require depth>0
-    // e1 (depth 3), child1 (depth 2), grand1 (depth 1), great1 (depth 0 → stops)
     expect(allCalls).toContain("e1");
     expect(allCalls).toContain("child1");
     expect(allCalls).toContain("grand1");
-    // great1 is NOT traversed (depth reaches 0)
-    expect(allCalls).not.toContain("great1");
+    expect(allCalls).toContain("great1");
+    expect(allCalls).toContain("level4");
+    // level5 is NOT traversed (depth reaches 0)
+    expect(allCalls).not.toContain("level5");
     expect(result.hasContext).toBe(true);
   });
 });

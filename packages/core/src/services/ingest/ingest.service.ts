@@ -9,9 +9,10 @@ export const proccessAndStore = async (
   llm: ILLMAdapter,
   storage: IStorageAdapter,
   embedding?: IEmbeddingAdapter,
+  isPermanent = false,
 ) => {
   const analysis = await analyzeTextWithAI(text, llm);
-  const entry = await storage.createEntry(userId, text, analysis);
+  const entry = await storage.createEntry(userId, text, { ...analysis, isPermanent });
 
   if (embedding) {
     try {

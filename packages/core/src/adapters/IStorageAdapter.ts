@@ -17,6 +17,7 @@ export interface EntryAnalysisData {
   strength: number;
   category: string;
   isProcessed: boolean;
+  isPermanent?: boolean;
 }
 
 export interface IStorageAdapter {

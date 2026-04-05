@@ -50,9 +50,9 @@ export const BRAIN = {
 
 export const MEMORY = {
   // Synaptic tree (intent.context.service)
-  SYNAPSE_TREE_DEPTH: 3,
-  SYNAPSE_BRANCH_FACTOR: 3,
-  CONTEXT_TOP_ENTRIES: 3,
+  SYNAPSE_TREE_DEPTH: 5,
+  SYNAPSE_BRANCH_FACTOR: 5,
+  CONTEXT_TOP_ENTRIES: 5,
   RAW_TEXT_PREVIEW_LENGTH: 80,
   MULTI_QUERY_MAX_TERMS: 3,   // max keywords queried independently in multi-query recall
 
