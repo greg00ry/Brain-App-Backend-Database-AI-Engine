@@ -1,6 +1,10 @@
 {
   "name": "@the-brain/cli",
   "version": "0.1.0",
+  "description": "CLI for The Brain — local-first cognitive memory. Save, recall, ingest PDFs, interactive chat.",
+  "license": "AGPL-3.0",
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "https://github.com/greg00ry/the-brain.git" },
   "type": "module",
   "bin": {
     "brain": "./dist/index.js"
